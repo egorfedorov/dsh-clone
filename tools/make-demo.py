@@ -196,7 +196,7 @@ def skeleton(canvas: Canvas, box, progress=1.0):
                         fill=(*BRAND_LIGHT, 40))
 
 
-def draw_frame(reference: str, timings, files, winner: int, adopted: str, beat: float, pulse: float) -> Image.Image:
+def draw_frame(reference: str, files, winner: int, adopted: str, score: str, beat: float, pulse: float) -> Image.Image:
     canvas = Canvas()
 
     # ── header ────────────────────────────────────────────────────────────
@@ -262,14 +262,17 @@ def draw_frame(reference: str, timings, files, winner: int, adopted: str, beat: 
         # footer: state + real numbers
         footer_y = box[1] + 198
         if settled:
-            colour, state = (OK, "ready") if files[index] > 0 else (WARN, "no page")
+            delivered = files[index] > 0
+            colour, state = (OK, "ready") if delivered else (WARN, "no page")
             canvas.ellipse((x0 + 12, footer_y + 2, x0 + 19, footer_y + 9), fill=(*colour, 255))
             canvas.text((x0 + 25, footer_y), state, F_SMALL, LABEL2)
-            canvas.text((x0 + 12, footer_y + 17), f"{timings[index]} · {files[index]} files", F_MONO_SMALL, LABEL3)
+            if delivered:
+                canvas.text((x0 + 12, footer_y + 17), f"{files[index]} files · rendered", F_MONO_SMALL, LABEL3)
             if is_winner:
                 canvas.rect((x0 + lane_width - 52, box[1] + 10, x0 + lane_width - 12, box[1] + 25), radius=7,
                             fill=(*BRAND, 255))
                 canvas.text((x0 + lane_width - 46, box[1] + 13), "PICK", F_CHIP, (255, 255, 255))
+                canvas.text((x0 + 12, footer_y + 32), f"{score} picture match", F_MONO_SMALL, OK)
         else:
             canvas.ellipse((x0 + 12, footer_y + 2, x0 + 19, footer_y + 9), fill=(*BRAND, 255))
             canvas.text((x0 + 25, footer_y), "building", F_SMALL, LABEL2)
@@ -292,7 +295,8 @@ def draw_frame(reference: str, timings, files, winner: int, adopted: str, beat: 
             canvas.rect((42, bar_top + 12, 118, bar_top + 32), radius=5, fill=(*BRAND, 44), outline=(*BRAND_LIGHT, 130))
             canvas.text((50, bar_top + 17), "index.html", F_MONO_SMALL, LABEL)
             canvas.text((132, bar_top + 13), adopted, F_MONO, LABEL)
-            canvas.text((132, bar_top + 29), "copied into your workspace — open it and it runs", F_SMALL, LABEL2)
+            canvas.text((132, bar_top + 29), f"copied into your workspace · {score} picture match · open it and it runs",
+                        F_SMALL, LABEL2)
 
     # ── captions ──────────────────────────────────────────────────────────
     caption = "1 screenshot"
@@ -303,7 +307,7 @@ def draw_frame(reference: str, timings, files, winner: int, adopted: str, beat: 
     if beat > 0.84:
         caption = "adopt one — it is already a working page"
     canvas.text((26, 448), caption, F_H2, LABEL)
-    canvas.text((26, 466), "illustration of one run · timings and lane states are the plugin's own numbers", F_TINY, LABEL3)
+    canvas.text((26, 466), "illustration of the flow · the match score is the demo run's measured value", F_TINY, LABEL3)
 
     for index in range(5):
         cx = 900 - index * 14
@@ -317,22 +321,19 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--reference", required=True)
     parser.add_argument("--out", required=True)
-    parser.add_argument("--timing", action="append", default=None, help="per-lane duration, e.g. 0:41")
+    parser.add_argument("--score", default="92.7%", help="the adopted lane's measured picture match")
     parser.add_argument("--files", action="append", type=int, default=None)
     parser.add_argument("--winner", type=int, default=2)
     parser.add_argument("--adopted", default="clone-a91c-lane-2")
     parser.add_argument("--frames", type=int, default=24)
     args = parser.parse_args()
 
-    timings = (args.timing or ["0:41", "0:58", "1:12"])[:3]
-    while len(timings) < 3:
-        timings.append("—")
     files = (args.files or [3, 4, 0])[:3]
     while len(files) < 3:
         files.append(0)
 
     frames = [
-        draw_frame(args.reference, timings, files, args.winner, args.adopted,
+        draw_frame(args.reference, files, args.winner, args.adopted, args.score,
                    beat=index / (args.frames - 1), pulse=(index * 0.24) % 1.0)
         for index in range(args.frames)
     ]

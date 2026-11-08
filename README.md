@@ -1,11 +1,12 @@
 <p align="center">
-  <img src="docs/assets/hero.png" alt="dsh-clone — screenshot in, working UI out" width="100%">
+  <a href="https://egorfedorov.github.io/dsh-clone/"><img src="docs/assets/hero.png" alt="dsh-clone — screenshot in, working UI out" width="100%"></a>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-4d6bff?style=flat-square"></a>
   <img alt="DeepSeek Harness plugin" src="https://img.shields.io/badge/DeepSeek%20Harness-plugin-4d6bff?style=flat-square">
   <img alt="Node 20+" src="https://img.shields.io/badge/node-%E2%89%A520-16202f?style=flat-square">
+  <a href="https://egorfedorov.github.io/dsh-clone/demo/"><img alt="Live demo" src="https://img.shields.io/badge/live-demo-22c55e?style=flat-square"></a>
   <a href="https://github.com/egorfedorov/dsh-clone/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/egorfedorov/dsh-clone?style=flat-square&color=4d6bff"></a>
 </p>
 
@@ -13,14 +14,18 @@
 
 <p align="center">
   Paste a screenshot of any interface. Run <code>/clone 3</code>. Three agents rebuild it in parallel,<br>
-  each in its own isolated directory. A live panel shows the reference beside every attempt.<br>
-  You adopt the one that looks right — and it is already a working page.
+  each in its own isolated directory. A live panel shows the reference beside every attempt,<br>
+  rendered and scored. You adopt the page that looks right — and it is already a working page.
 </p>
 
 <p align="center">
-  <img src="docs/assets/demo.gif" alt="One run: the reference arrives, three lanes build in parallel, one is adopted into the workspace" width="100%">
+  <a href="https://egorfedorov.github.io/dsh-clone/demo/"><b>→ Open a real clone in the browser</b></a>
   <br>
-  <sub>Illustration of one run — the timings and lane states in it are the plugin's own numbers, not a mock.</sub>
+  <sub>built by this plugin from <a href="docs/assets/reference.png">this screenshot</a> · 92.7% picture match</sub>
+</p>
+
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="The flow: the reference arrives, three lanes build in parallel, one is adopted and scored" width="100%">
 </p>
 
 ---
@@ -30,7 +35,7 @@
 ```
 you:  [paste a screenshot]  /clone 3
 me:   ▸ three agents, three isolated directories, same reference
-      ▸ live panel: reference | lane 1 | lane 2 | lane 3
+      ▸ live panel: reference | lane 1 | lane 2 | lane 3   (rendered + scored)
 you:  [Adopt this one]
 me:   ▸ ./clone-a91c-lane-2/index.html  ← open it, it runs
 ```
@@ -43,7 +48,7 @@ A screenshot is the most precise specification a person can give. Every other in
 
 The usual flow is still: describe it, get one attempt, describe the differences, get another attempt. One attempt is a lottery — you cannot tell whether the model misunderstood you or simply chose a different solution, because you only ever see one.
 
-`dsh-clone` changes the cost of being wrong. Three or four builders see the same reference and work the same problem from different angles. You compare finished pages, not promises, and keep the best.
+`dsh-clone` changes the cost of being wrong. Three or four builders see the same reference and work the same problem from different angles, every delivered page is rendered and compared with the reference, and you keep the best.
 
 | Lane strategy | What that builder is told to do |
 |---|---|
@@ -54,12 +59,15 @@ The usual flow is still: describe it, get one attempt, describe the differences,
 
 ## Demo
 
+A real run, not a mock: one command, one lane adopted, no retries.
+
 | | |
 |---|---|
-| **Reference** | <img src="docs/assets/reference.png" alt="reference dashboard" width="420"> |
-| **A real run** | see the numbers below — same machine, one command, no retries |
+| **Reference** — what the person pasted | <img src="docs/assets/reference.png" alt="reference sign-in screen" width="420"> |
+| **The clone** — rendered by the plugin from the adopted lane | <img src="demo/preview.png" alt="the adopted clone, rendered" width="420"> |
+| **Result** | **92.7% picture match** · plain HTML + CSS + JS · [open it live](https://egorfedorov.github.io/dsh-clone/demo/) |
 
-<!-- RUN-TABLE -->
+The score is the plugin's own: the rendered page and the reference are averaged into a coarse colour grid and compared. It measures *how much of the picture agrees*, not whether the page is correct — see [Honest limits](#honest-limits).
 
 ## Install
 
@@ -76,7 +84,7 @@ git clone https://github.com/egorfedorov/dsh-clone
 # Settings → Plugins → Install bundle → /absolute/path/to/dsh-clone
 ```
 
-Requires a DeepSeek Harness profile with `subagents` (the `dsh-base` bundle ships the `spawn` backend) and Node 20+.
+Requires a DeepSeek Harness profile with `subagents` (the `dsh-base` bundle ships the `spawn` backend) and Node 20+. Scoring additionally uses a Chromium-family browser if one is installed; without it everything else still works.
 
 ## Usage
 
@@ -88,7 +96,7 @@ Paste a screenshot into the conversation, then:
 | `/clone 4` | four lanes — maximal spread of approaches |
 | `/clone 2 darker, mobile-first` | two lanes plus a note every builder must honour |
 | `/clone 3 ./mock.png` | use an explicit image path instead of the conversation image |
-| `/clone status` | lane states, timings, and the suggested winner |
+| `/clone status` | lane states, scores, and the suggested winner |
 | `/clone pick 2` | adopt lane 2 into the workspace |
 | `/clone cancel` | stop the builders |
 | `/clone discard` | delete the scratch directories and lane branches |
@@ -105,10 +113,9 @@ clone({ action: "pick", lane: 2 })
 
 A **Clone** tab appears in the conversation view ring while a clone exists:
 
-- the reference screenshot on the left, with the viewport you asked for;
-- one card per lane: a live iframe of the actual page, its strategy, elapsed time, tool calls, file count, token spend;
-- **Adopt this one** on any lane that produced an `index.html`;
-- the suggested lane is marked once everything settles.
+- the reference screenshot on the left, at the size the lanes are building for;
+- one card per lane: a live iframe of the actual page, its strategy, elapsed time, tool calls, file count, token spend, and its **picture-match score** once rendered;
+- the best-scoring lane is marked as suggested, and **Adopt this one** works on any lane that produced an `index.html`.
 
 A small chip under the composer shows `clone · 2/3` while builders run, so you can leave the tab.
 
@@ -120,9 +127,11 @@ A small chip under the composer shows `clone · 2/3` while builders run, so you 
 
 > no build step · no network at runtime · no CDN · no placeholder copy · fill the viewport · approximate every image with CSS/SVG · leave no scratch files
 
-The strategies differ; the contract does not. That is what makes the set worth comparing.
+The strategies differ; the contract does not. Every lane also carries an explicit effort budget (≈20-25 tool calls) and a wall-clock limit: a builder that keeps polishing is stopped, and whatever it already wrote is delivered and scored instead of stalling the clone.
 
-**The preview.** Lane pages are served from this page's own origin through `/api/dsh-clone/preview/<clone>/<lane>/` — no extra port, no proxy, the same authenticated connection the UI already uses. Because the HTML is model-written, it is served with a `sandbox` CSP (no `allow-same-origin`) and mounted in a `sandbox="allow-scripts"` iframe: a clone can run its own code, but it cannot read your cookies, storage, or this app's API.
+**The score.** When a lane delivers, the plugin finds an installed Chromium-family browser (Chrome, Chromium, Edge, Brave — `DSH_CLONE_BROWSER` overrides), screenshots the page at the reference's own pixel size, and compares it with the reference: both images are averaged into a 48×32 colour grid and the mean absolute difference becomes a percentage. Highest score suggests the winner; you still choose. No browser, no score — the panel then falls back to completeness and finish order.
+
+**The preview.** Lane pages are served from this page's own origin through `/api/dsh-clone/preview/<clone>/<lane>/` — no extra port, no proxy, the same authenticated connection the UI already uses. Because the HTML is model-written, it is served with a `sandbox` CSP (no `allow-same-origin`) and mounted in a `sandbox="allow-scripts"` iframe: a clone can run its own code, but it cannot reach your session, credentials, or the Harness API.
 
 **Adoption.** `pick` copies the chosen lane into the workspace as `clone-<id>-lane-<n>/`, without `.git`, without the symlinked dependency directories, and without the builder's scratch files. The other lanes stay where they are until you `/clone discard`.
 
@@ -134,7 +143,8 @@ All optional; the defaults are the intended experience.
 |---|---|---|
 | `lanes` | `3` | lane count when the command does not name one |
 | `maxLanes` | `4` | hard cap on lanes per clone |
-| `viewport` | `1280x800` | target viewport written into every builder prompt |
+| `viewport` | `auto` | build and render size; `auto` uses the reference image's own pixel size |
+| `laneTimeoutMs` | `900000` | wall-clock limit per lane (15 min); the lane is stopped and its output kept |
 | `provider` | `spawn` | `ctx.subagents` backend used for builders |
 | `pollMs` | `900` | live counter refresh interval |
 | `commandName` | `clone` | rename the slash command |
@@ -145,7 +155,7 @@ All optional; the defaults are the intended experience.
   name: dsh-clone
   config:
     lanes: 4
-    viewport: 1440x900
+    laneTimeoutMs: 600000
 ```
 
 ## Safety
@@ -154,23 +164,25 @@ All optional; the defaults are the intended experience.
 - Lane pages are sandboxed into an opaque origin, so model-written HTML cannot reach your session, credentials, or the Harness API.
 - Every write happens inside the workspace: `.dsh-clone/` for scratch, `clone-*/` for adopted results, plus lane branches in your repository (removed by `/clone discard`).
 - `git worktree` is used without touching your checkout: no commit, no checkout, no reset in your working tree. `test/git-lane.mjs` asserts exactly that.
+- The scoring renderer is a one-shot headless screenshot of a local file. It loads no remote page.
 
 ## Honest limits
 
 - **Cost is N×.** Three builders cost roughly three builds. `lanes: 2` is a reasonable everyday setting; `lanes: 1` makes it a plain "screenshot → page" button.
-- **You are the judge.** dsh-clone ranks by completeness and finish time, and it says so. It does not invent a pixel-similarity score: a real one needs a headless renderer, which is roadmap work, not a claim.
+- **The score measures the picture, not the truth.** 92% agreement can still hide wrong copy, a missing form action, or broken behaviour. It ranks attempts; it does not certify one.
+- **The score is coarse by design.** A 48×32 grid is forgiving about a few pixels and strict about a panel on the wrong side. Two lanes a few points apart are usually a coin flip — open both before adopting.
 - **Vision is required.** The builder must actually see the reference. A text-only model produces a guess; pair dsh-clone with a vision-capable route or a vision bridge plugin.
 - **Images are approximated.** Without image generation, photos and illustrations become CSS/SVG stand-ins with the right silhouette and palette, not the original pixels.
 - **Static output.** No Next.js project, no design system — by design, so the result is always runnable in one click.
-- **A careful builder is a slow builder.** The lane prompts carry an explicit effort budget (≈20-25 tool calls) because an agent that keeps cropping the screenshot instead of writing the page burns tokens without improving the result. Tune `lanes`, not patience.
+- **A careful builder is a slow builder.** Hence the effort budget and the wall-clock limit; tune those, not your patience.
 
 ## Roadmap
 
-1. **Pixel-diff judging** — render each lane at the reference viewport, score structural similarity, rank objectively; falls back to the human pick.
-2. **Iterate on the winner** — `/clone refine 2 "move the CTA up"` re-opens the adopted lane against the same reference.
-3. **Reference regions** — "clone just this card" instead of a whole page.
-4. **Adopt as a diff** — when the workspace is a component library, adopt as an edit to an existing file instead of a new folder.
-5. **Lane budgets** — a token ceiling per lane, so a runaway builder cannot eat the month.
+1. **Score-aware iteration** — `/clone refine 2 "move the CTA up"` re-opens the adopted lane against the same reference and reports the score delta.
+2. **Region scoring** — "clone just this card": compare only the rectangle that matters instead of the whole page.
+3. **Adopt as a diff** — when the workspace is a component library, adopt as an edit to an existing file instead of a new folder.
+4. **Lane budgets in tokens** — a ceiling per lane, not just wall-clock.
+5. **Multi-reference** — several screenshots of the same flow, one page per screen.
 
 ## Repository layout
 
@@ -179,13 +191,19 @@ index.js            Host half: /clone command, clone tool, web routes, poller
 client.js           Client half: the Clone panel and the composer chip
 lib/engine.js       Clone state machine (pure, dependency-injected)
 lib/prompts.js      The delivery contract, the effort budget, four strategies
+lib/render.js       Headless screenshot through an installed Chromium browser
+lib/score.js        Coarse-grid picture comparison
+lib/png.js          Dependency-free PNG decoder
 lib/parse.js        /clone grammar
-lib/rank.js         Adoptability, ordering, suggestion
+lib/rank.js         Adoptability, score-first ordering, suggestion
 lib/preview.js      Static lane serving, media types, sandbox CSP, JSON routes
 lib/util.js         Small pure helpers
-test/smoke.mjs      19 tests, no Harness required
+test/smoke.mjs      30 tests, no Harness required
 test/git-lane.mjs   worktree isolation against a real repository
-tools/make-demo.py  Regenerates docs/assets/demo.gif from a reference image
+tools/make-hero.py  Regenerates docs/assets/hero.png
+tools/make-demo.py  Regenerates docs/assets/demo.gif
+docs/index.html     GitHub Pages landing page
+docs/demo/          A real clone, served live
 docs/ARCHITECTURE.md
 ACCEPTABLE-USE.md
 ```
@@ -194,18 +212,18 @@ ACCEPTABLE-USE.md
 
 ```bash
 npm run check      # syntax-check every shipped file
-npm test           # 19 assertions: grammar, ranking, prompts, full engine lifecycle
+npm test           # 30 assertions: grammar, ranking, scoring, engine lifecycle
 npm run test:git   # the git-worktree isolation model against a real repository
 npm run test:all   # both
 ```
 
-The engine takes every side effect as a dependency, so the tests drive the real state machine against a temporary directory with fake subagents — no Harness, no network, no model. `test/git-lane.mjs` goes further and builds a throwaway repository to prove that lanes are real worktrees, that your own dirty working tree and branch are untouched, that dependency directories are shared by symlink, and that discard removes worktrees and branches while the adopted copy survives.
+The engine takes every side effect as a dependency, so the tests drive the real state machine against a temporary directory with fake subagents — no Harness, no network, no model. The pixel tests decode the demo reference and a committed real lane render, so a regression in either the decoder or the scoring curve fails the suite. `test/git-lane.mjs` builds a throwaway repository to prove that lanes are real worktrees, that your own dirty working tree and branch are untouched, that dependency directories are shared by symlink, and that discard removes worktrees and branches while the adopted copy survives.
 
 ## По-русски
 
-Плагин для DeepSeek Harness: скидываешь скриншот интерфейса, пишешь `/clone 3` — три агента параллельно собирают его в изолированных папках (в репозитории — через git worktree). В панели «Clone» видно эталон и все попытки рядом, каждая уже живая. Нажимаешь «Adopt this one» — выбранный вариант копируется в рабочую папку как готовая страница. Остальные удаляются командой `/clone discard`.
+Плагин для DeepSeek Harness: скидываешь скриншот интерфейса, пишешь `/clone 3` — три агента параллельно собирают его в изолированных папках (в репозитории — через git worktree). В панели «Clone» видно эталон и все попытки рядом; каждая готовая страница рендерится в headless-браузере и получает процент совпадения картинки. Нажимаешь «Adopt this one» — выбранный вариант копируется в рабочую папку как готовая страница. Остальные удаляются командой `/clone discard`.
 
-Честно: стоимость — примерно N попыток; судья — вы, автоматической оценки пиксельного совпадения в этой версии нет; нужна модель, которая видит картинку.
+Честно: стоимость — примерно N попыток; оценка совпадения меряет картинку, а не правильность (текст и поведение всё равно проверяй глазами); нужна модель, которая видит изображение.
 
 ## License
 
