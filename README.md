@@ -192,6 +192,7 @@ client.js           Client half: the Clone panel and the composer chip
 lib/engine.js       Clone state machine (pure, dependency-injected)
 lib/prompts.js      The delivery contract, the effort budget, four strategies
 lib/render.js       Headless screenshot through an installed Chromium browser
+lib/score-lane.js   Render-and-score composition shared by the plugin and its test
 lib/score.js        Coarse-grid picture comparison
 lib/png.js          Dependency-free PNG decoder
 lib/parse.js        /clone grammar
@@ -200,6 +201,7 @@ lib/preview.js      Static lane serving, media types, sandbox CSP, JSON routes
 lib/util.js         Small pure helpers
 test/smoke.mjs      30 tests, no Harness required
 test/git-lane.mjs   worktree isolation against a real repository
+test/render-score.mjs  real render + score through the plugin's own path
 tools/make-hero.py  Regenerates docs/assets/hero.png
 tools/make-demo.py  Regenerates docs/assets/demo.gif
 docs/index.html     GitHub Pages landing page
@@ -211,13 +213,14 @@ ACCEPTABLE-USE.md
 ## Development
 
 ```bash
-npm run check      # syntax-check every shipped file
-npm test           # 30 assertions: grammar, ranking, scoring, engine lifecycle
-npm run test:git   # the git-worktree isolation model against a real repository
-npm run test:all   # both
+npm run check       # syntax-check every shipped file
+npm test            # 30 assertions: grammar, ranking, scoring, engine lifecycle
+npm run test:git    # the git-worktree isolation model against a real repository
+npm run test:score  # a real render + score through the plugin's own code path
+npm run test:all    # all three
 ```
 
-The engine takes every side effect as a dependency, so the tests drive the real state machine against a temporary directory with fake subagents — no Harness, no network, no model. The pixel tests decode the demo reference and a committed real lane render, so a regression in either the decoder or the scoring curve fails the suite. `test/git-lane.mjs` builds a throwaway repository to prove that lanes are real worktrees, that your own dirty working tree and branch are untouched, that dependency directories are shared by symlink, and that discard removes worktrees and branches while the adopted copy survives.
+The engine takes every side effect as a dependency, so the tests drive the real state machine against a temporary directory with fake subagents — no Harness, no network, no model. The pixel tests decode the demo reference and a committed real lane render, so a regression in either the decoder or the scoring curve fails the suite. `test/git-lane.mjs` builds a throwaway repository to prove that lanes are real worktrees, that your own dirty working tree and branch are untouched, that dependency directories are shared by symlink, and that discard removes worktrees and branches while the adopted copy survives. `test/render-score.mjs` goes through the plugin's own scoring path with two fake builders — one faithful, one deliberately desaturated — and asserts that both come back scored, that the faithful one wins, and that the snapshot carries the score and the render URL. It skips itself when no browser is installed.
 
 ## По-русски
 

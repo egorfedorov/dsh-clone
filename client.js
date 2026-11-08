@@ -72,6 +72,7 @@ window.__ModuleLoader__.load({
       'panel.discard': 'Discard scratch',
       'panel.running': 'building',
       'panel.settled': 'ready',
+      'panel.scoring': 'scoring',
       'panel.emptyLane': 'no page',
       'panel.failed': 'failed',
       'panel.cancelled': 'cancelled',
@@ -198,6 +199,7 @@ window.__ModuleLoader__.load({
 
     const STATUS_COLOR = {
       running: T.brand,
+      scoring: T.brand,
       settled: T.success,
       finished: T.success,
       empty: T.warn,

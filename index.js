@@ -21,8 +21,7 @@ import { basename, dirname, extname, resolve as resolvePath } from 'node:path'
 import { cp, copyFile, mkdir, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { CloneEngine } from './lib/engine.js'
 import { parseCloneArgs, referenceHintOf } from './lib/parse.js'
-import { detectRenderer, renderPage } from './lib/render.js'
-import { scoreRender } from './lib/score.js'
+import { makeScoreLane } from './lib/score-lane.js'
 import { clampLanes, mediaTypeOf, reasonOf, truncate } from './lib/util.js'
 import {
   parsePreviewPath,
@@ -180,27 +179,9 @@ export async function apply(ctx, rawConfig) {
     }
   }
 
-  /**
-   * Render one delivered lane and score it against the reference screenshot.
-   * Every step is optional: no installed browser, a render that never lands, or
-   * bytes the decoder refuses leave the lane unscored instead of failing it.
-   */
-  const scoreLane = async ({ laneDir, referencePath, outPath, viewport }) => {
-    const browser = await detectRenderer(runCommand)
-    if (browser === null) return null
-    await mkdir(dirname(outPath), { recursive: true })
-    const rendered = await renderPage({
-      run: runCommand,
-      renderer: browser,
-      filePath: `${laneDir}/index.html`,
-      outPath,
-      viewport,
-    })
-    if (rendered === null) return null
-    const [referencePng, renderPng] = await Promise.all([readFile(referencePath), readFile(rendered)])
-    const { score } = scoreRender({ referencePng, renderPng })
-    return { score, outPath: rendered }
-  }
+  // Rendering and scoring live in lib/score-lane.js so the integration test
+  // drives the same path the plugin does.
+  const scoreLane = makeScoreLane(runCommand)
 
   const engine = new CloneEngine({
     now: () => Date.now(),
