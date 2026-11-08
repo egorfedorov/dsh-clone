@@ -67,6 +67,14 @@ A real run, not a mock: one command, one lane adopted, no retries.
 | **The clone** — rendered by the plugin from the adopted lane | <img src="docs/demo/preview.png" alt="the adopted clone, rendered" width="420"> |
 | **Result** | **92.7% picture match** · plain HTML + CSS + JS · [open it live](https://egorfedorov.github.io/dsh-clone/demo/) |
 
+A second run, a different shape — a small billing card, where the builder's own layout spec paid off:
+
+| | |
+|---|---|
+| **Reference** | <img src="docs/assets/card-reference.png" alt="reference billing card" width="360"> |
+| **The clone** — rendered by the plugin | <img src="docs/assets/card-clone.png" alt="the billing card clone, rendered" width="360"> |
+| **Result** | **99.8% picture match** · one file, no assets, no JS · [open it live](https://egorfedorov.github.io/dsh-clone/demo/card.html) |
+
 The score is the plugin's own: the rendered page and the reference are averaged into a coarse colour grid and compared. It measures *how much of the picture agrees*, not whether the page is correct — see [Honest limits](#honest-limits).
 
 ## Install
