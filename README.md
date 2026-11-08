@@ -79,18 +79,26 @@ The score is the plugin's own: the rendered page and the reference are averaged 
 
 ## Install
 
-**In the Harness Web UI** — Settings → Plugins, then install the bundle by package name, or from a checkout directory:
+**In the Harness Web UI** — Settings → Plugins → **Add plugin**, then install by package name:
 
 ```
 dsh-clone
+```
+
+Or add this repository's market index under **Plugins → Custom plugin indexes**, and install `dsh-clone` from the Discover tab in one click:
+
+```
+https://raw.githubusercontent.com/egorfedorov/dsh-clone/main/index.json
 ```
 
 **From a checkout** (development):
 
 ```bash
 git clone https://github.com/egorfedorov/dsh-clone
-# Settings → Plugins → Install bundle → /absolute/path/to/dsh-clone
+# Settings → Plugins → Add plugin → /absolute/path/to/dsh-clone
 ```
+
+**Updating** — the market reports `update-available` when this repository's index (or npm) lists a newer compatible version. The market format has no in-place upgrade, so an update is a reinstall: your work lives in the workspace (`.dsh-clone/`, `clone-*/`), so reinstalling loses nothing. See [docs/PUBLISHING.md](docs/PUBLISHING.md) for the whole distribution story.
 
 Requires a DeepSeek Harness profile with `subagents` (the `dsh-base` bundle ships the `spawn` backend) and Node 20+. Scoring additionally uses a Chromium-family browser if one is installed; without it everything else still works.
 
@@ -210,8 +218,13 @@ lib/util.js         Small pure helpers
 test/smoke.mjs      30 tests, no Harness required
 test/git-lane.mjs   worktree isolation against a real repository
 test/render-score.mjs  real render + score through the plugin's own path
+index.json          Format-1 plugin market index (Custom plugin indexes)
+screenshots.json    Storefront screenshots (read by dsh-market)
 tools/make-hero.py  Regenerates docs/assets/hero.png
+tools/make-icon.py  Regenerates the storefront icon
 tools/make-demo.py  Regenerates docs/assets/demo.gif
+docs/PUBLISHING.md  npm, the awesome list, indexes, the official program
+docs/storefront/    Ready-to-submit entry for awesome-dsh-plugin
 docs/index.html     GitHub Pages landing page
 docs/demo/          A real clone, served live
 docs/ARCHITECTURE.md

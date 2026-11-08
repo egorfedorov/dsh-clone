@@ -1,0 +1,75 @@
+{
+  "format": 1,
+  "title": {
+    "en": "dsh-clone",
+    "zh": "dsh-clone"
+  },
+  "description": {
+    "en": "Index for the dsh-clone plugin. Add this URL under Plugins → Custom plugin indexes to install it from the Discover tab.",
+    "zh": "dsh-clone 插件索引。在「插件 → 自定义插件索引」中添加此地址，即可在 Discover 页安装。"
+  },
+  "metadata": {
+    "categories": {
+      "ui": {
+        "title": {
+          "en": "UI & design tools",
+          "zh": "界面与设计工具"
+        }
+      },
+      "dev": {
+        "title": {
+          "en": "Development & runtime",
+          "zh": "开发与运行时"
+        }
+      }
+    },
+    "labels": {},
+    "sortKeys": {}
+  },
+  "plugins": [
+    {
+      "name": "dsh-clone",
+      "title": {
+        "en": "Clone",
+        "zh": "克隆"
+      },
+      "description": {
+        "en": "Rebuild a reference screenshot as working UI: several agents build the same screen in parallel in isolated git worktrees, every delivered page is rendered and scored against the reference, and the reader adopts the result they prefer as a static page.",
+        "zh": "把参考截图重建为可运行的界面：多个智能体在各自的 git worktree 中并行构建同一屏，每个完成的页面都会被渲染并与参考图比对打分，由使用者采用最满意的一版（纯静态页面）。"
+      },
+      "icon": "docs/assets/icon-180.png",
+      "author": "Egor Fedorov",
+      "homepage": "https://egorfedorov.github.io/dsh-clone/",
+      "repository": {
+        "url": "https://github.com/egorfedorov/dsh-clone"
+      },
+      "metadata": {
+        "category": "ui",
+        "keywords": [
+          "screenshot-to-code",
+          "ui",
+          "design-to-code",
+          "subagents",
+          "worktree",
+          "clone"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1794156755,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/egorfedorov/dsh-clone",
+            "commit": "19f6220f2e2ed5853767baa142035096563113af"
+          },
+          "engines": {
+            "dsh": ">=0.2.0-rc.2 || >=0.2.1-rc.2 || >=0.2.2-rc.1"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -24,7 +24,8 @@
     "worktree"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=20",
+    "dsh": ">=0.2.0-rc.2 || >=0.2.1-rc.2 || >=0.2.2-rc.1"
   },
   "main": "index.js",
   "exports": {
@@ -43,7 +44,10 @@
     "cordis.patch.yml",
     "README.md",
     "ACCEPTABLE-USE.md",
-    "LICENSE"
+    "LICENSE",
+    "index.json",
+    "screenshots.json",
+    "docs/assets/icon-180.png"
   ],
   "dsh": {
     "bundle": {
@@ -63,5 +67,8 @@
     "test:all": "node test/smoke.mjs && node test/git-lane.mjs && node test/render-score.mjs",
     "check": "node --check index.js && node --check client.js && for f in lib/*.js; do node --check \"$f\" || exit 1; done",
     "test:score": "node test/render-score.mjs"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
