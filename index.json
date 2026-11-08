@@ -63,7 +63,7 @@
           "source": {
             "type": "git",
             "url": "https://github.com/egorfedorov/dsh-clone",
-            "commit": "78061fda4274e1f4106ed8619bd15190394701a2"
+            "commit": "4a323fa2ae695812f103e8071deb935600cefeb7"
           },
           "engines": {
             "dsh": ">=0.2.0-rc.2 || >=0.2.1-rc.2 || >=0.2.2-rc.1"
