@@ -397,6 +397,41 @@ test('engine: missing reference is a clear error, not a crash', async () => {
   }
 })
 
+test('engine: the lane time limit settles a builder that never finishes', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
+  const images = await mkdtemp(join(tmpdir(), 'dsh-clone-img-'))
+  const imagePath = join(images, 'mock.png')
+  await writeFile(imagePath, 'png-bytes')
+
+  try {
+    let interrupted = 0
+    const { deps } = fakeDeps(workspace, {
+      imagePath,
+      // Writes its page, then never settles: exactly the "keeps polishing" case.
+      laneBuilder: async (cwd) => { await writeFile(join(cwd, 'index.html'), '<!doctype html>ok') },
+    })
+    deps.config = { viewport: '900x620', laneTimeoutMs: 120 }
+    deps.spawnAgent = async ({ cwd, label }) => {
+      await writeFile(join(cwd, 'index.html'), '<!doctype html>ok')
+      return { childId: `never-${label}`, result: new Promise(() => {}), dispose: async () => {} }
+    }
+    deps.interruptAgent = () => { interrupted += 1 }
+
+    const engine = new CloneEngine(deps)
+    const clone = await engine.start({ agent: { id: 's1' }, sessionId: 's1', lanes: 2, note: '', viewport: 'auto' })
+    await waitFor(() => clone.status === 'finished', { timeoutMs: 5000 })
+
+    assert.equal(clone.lanes.every((lane) => lane.timedOut === true), true)
+    assert.equal(clone.lanes.every((lane) => lane.status === 'settled'), true, 'a delivered page survives the limit')
+    assert.equal(clone.lanes.every((lane) => lane.stopReason === 'time-limit'), true)
+    assert.equal(interrupted, 2, 'both builders were interrupted')
+    assert.equal(engine.laneTimers.size, 0, 'no timer leaks after the clone closes')
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+    await rm(images, { recursive: true, force: true })
+  }
+})
+
 test('engine: cancel closes every running lane', async () => {
   const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
   const images = await mkdtemp(join(tmpdir(), 'dsh-clone-img-'))

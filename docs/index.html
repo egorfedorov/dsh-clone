@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dsh-clone — screenshot in, working UI out</title>
+<meta name="description" content="A DeepSeek Harness plugin: several agents rebuild the same reference screenshot in parallel, and you adopt the live page that looks right.">
+<meta property="og:title" content="dsh-clone — screenshot in, working UI out">
+<meta property="og:description" content="Several agents rebuild the same reference screenshot in parallel. You adopt the live page that looks right.">
+<meta property="og:image" content="assets/hero.png">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0a0e16;
+    --panel: #16202f;
+    --border: #2a3a52;
+    --brand: #5b7cff;
+    --brand-light: #8fb0ff;
+    --label: #f3f7ff;
+    --label2: #8b9bb4;
+    --label3: #6e809a;
+    --ok: #22c55e;
+    --font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1000px 520px at 78% -10%, rgba(91,124,255,.22), transparent 60%),
+      linear-gradient(180deg, #0a0e16, #0f1726 55%, #0a0e16);
+    color: var(--label);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 40px 24px 72px; }
+  .hero { width: 100%; border-radius: 18px; display: block; box-shadow: 0 30px 80px -40px rgba(0,0,0,.9); }
+  h1 { font-size: clamp(30px, 5vw, 48px); letter-spacing: -.03em; margin: 44px 0 12px; line-height: 1.05; }
+  h1 span { color: var(--brand-light); }
+  .lede { color: var(--label2); font-size: 17px; line-height: 1.55; max-width: 62ch; margin: 0 0 28px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 40px; }
+  a.btn {
+    display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+    padding: 12px 20px; border-radius: 12px; font-weight: 600; font-size: 14px;
+  }
+  a.primary { background: var(--brand); color: #fff; }
+  a.primary:hover { background: #6c8aff; }
+  a.ghost { border: 1px solid var(--border); color: var(--label); background: rgba(255,255,255,.02); }
+  a.ghost:hover { border-color: #3b5273; }
+  code, pre { font-family: var(--mono); }
+  pre {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px; overflow-x: auto; font-size: 13px; line-height: 1.55; color: #cfe0ff;
+  }
+  pre b { color: var(--brand-light); font-weight: 600; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin: 26px 0 8px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+  .card h3 { margin: 0 0 6px; font-size: 14px; }
+  .card p { margin: 0; color: var(--label2); font-size: 13px; line-height: 1.5; }
+  .shots { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; margin: 18px 0 0; }
+  .shots figure { margin: 0; }
+  .shots img { width: 100%; border-radius: 12px; border: 1px solid var(--border); display: block; }
+  .shots figcaption { color: var(--label3); font-size: 12px; margin-top: 8px; }
+  .shots figcaption b { color: var(--ok); }
+  h2 { font-size: 20px; letter-spacing: -.01em; margin: 48px 0 6px; }
+  .muted { color: var(--label3); font-size: 13px; }
+  footer { margin-top: 56px; color: var(--label3); font-size: 12.5px; border-top: 1px solid var(--border); padding-top: 18px; }
+  footer a { color: var(--label2); }
+  @media (max-width: 720px) { .shots { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a href="https://github.com/egorfedorov/dsh-clone"><img class="hero" src="assets/hero.png" alt="dsh-clone — screenshot in, working UI out"></a>
+
+  <h1>Screenshot in. <span>Working UI out.</span></h1>
+  <p class="lede">
+    A DeepSeek Harness plugin. Paste a screenshot of any interface, run <code>/clone 3</code>, and three agents
+    rebuild it in parallel — each in its own isolated directory. A live panel shows the reference beside every
+    attempt, each one rendered and scored. You adopt the page that looks right, and it is already a working page.
+  </p>
+
+  <div class="row">
+    <a class="btn primary" href="demo/">Open the live clone →</a>
+    <a class="btn ghost" href="https://github.com/egorfedorov/dsh-clone">GitHub</a>
+    <a class="btn ghost" href="https://github.com/egorfedorov/dsh-clone#install">Install</a>
+  </div>
+
+  <pre>you:  [paste a screenshot]  <b>/clone 3</b>
+me:   ▸ 3 agents · 3 isolated directories · same reference
+      ▸ reference | lane 1 | lane 2 | lane 3   (live, rendered, scored)
+you:  [Adopt this one]
+me:   ▸ ./clone-a91c-lane-2/index.html  ← open it, it runs</pre>
+
+  <h2>One real run, not a mock</h2>
+  <p class="muted">Reference on the left, the adopted lane on the right. The score is the plugin's own: a coarse-grid picture comparison of the rendered page against the reference.</p>
+  <div class="shots">
+    <figure>
+      <img src="assets/reference.png" alt="reference sign-in screen">
+      <figcaption>Reference — what the person pasted</figcaption>
+    </figure>
+    <figure>
+      <img src="demo/preview.png" alt="the adopted clone, rendered">
+      <figcaption>Clone, rendered — <b>92.7% match</b> · <a href="demo/">open it live</a></figcaption>
+    </figure>
+  </div>
+
+  <h2>What it does that one attempt cannot</h2>
+  <div class="grid">
+    <div class="card"><h3>Three angles</h3><p>Measure first, structure first, visual first — the same reference, three working methods.</p></div>
+    <div class="card"><h3>Isolated lanes</h3><p>In a repository every lane is a real git worktree on its own branch. Your checkout is never touched.</p></div>
+    <div class="card"><h3>Rendered and scored</h3><p>Each delivered lane is screenshotted headlessly and compared with the reference. The best score is suggested; you decide.</p></div>
+    <div class="card"><h3>Adopted, not exported</h3><p>One click copies the winning lane into your workspace as plain HTML/CSS/JS. No build step, no server.</p></div>
+  </div>
+
+  <footer>
+    MIT · <a href="https://github.com/egorfedorov/dsh-clone">github.com/egorfedorov/dsh-clone</a><br>
+    The demo page was built by the plugin from <code>assets/reference.png</code>. Use it on interfaces you have the right to rebuild.
+  </footer>
+</div>
+</body>
+</html>

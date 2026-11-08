@@ -54,6 +54,11 @@ export function resolveConfig(raw) {
     viewport,
     provider: typeof input.provider === 'string' && input.provider.length > 0 ? input.provider : 'spawn',
     pollMs: Number.isFinite(input.pollMs) && input.pollMs >= 200 ? Math.floor(input.pollMs) : 900,
+    // Wall-clock limit per lane. A builder that keeps polishing past its budget
+    // is stopped and whatever it already wrote is delivered and scored.
+    laneTimeoutMs: Number.isFinite(input.laneTimeoutMs) && input.laneTimeoutMs >= 60_000
+      ? Math.floor(input.laneTimeoutMs)
+      : 15 * 60 * 1000,
     commandName: typeof input.commandName === 'string' && input.commandName.length > 0 ? input.commandName : 'clone',
     tool: input.tool !== false,
     command: input.command !== false,
