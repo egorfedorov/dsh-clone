@@ -141,6 +141,10 @@
 
   /* ── sections ──────────────────────────────────────────────────────── */
   section { padding: 72px 0 0; }
+  .kick {
+    font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--brand-2); margin: 0 0 10px;
+  }
   .kicker {
     font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
     color: var(--brand-2); margin: 0 0 10px;
@@ -196,6 +200,19 @@
   .ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
   .score-card p { margin: 0; font-size: 13.5px; color: var(--label-2); }
   .score-card strong { display: block; color: var(--label); font-size: 15px; margin-bottom: 3px; }
+
+  /* ── gallery ───────────────────────────────────────────────────────── */
+  .gallery { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin: 26px 0 0; }
+  .ex {
+    display: block; border-radius: var(--r); overflow: hidden; text-decoration: none;
+    border: 1px solid var(--border); background: var(--panel);
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+  }
+  .ex:hover { transform: translateY(-3px); border-color: var(--border-strong); box-shadow: 0 24px 60px -34px rgba(0,0,0,.9); text-decoration: none; }
+  .ex img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top left; border-bottom: 1px solid var(--border); }
+  .ex-meta { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; }
+  .ex-meta b { font-size: 13.5px; color: var(--label); font-weight: 620; }
+  .ex-meta i { font-style: normal; font-size: 11.5px; color: var(--label-3); font-family: var(--mono); }
 
   /* ── steps ─────────────────────────────────────────────────────────── */
   .steps { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); margin: 26px 0 0; counter-reset: step; }
@@ -270,6 +287,7 @@
     <a class="brand" href="#top"><img src="assets/icon-180.png" alt=""><span>dsh-clone</span></a>
     <div class="nav-links">
       <a href="#demo">Demo</a>
+      <a href="#examples">Examples</a>
       <a href="#how">How it works</a>
       <a href="#install">Install</a>
       <a href="#faq">FAQ</a>
@@ -310,35 +328,60 @@
       render of it. No retries, no edits — one command, one adopted lane.
     </p>
     <div class="compare reveal" id="compare">
-      <img src="assets/card-clone.png" alt="The clone the plugin built, rendered">
-      <div class="after"><img src="assets/card-reference.png" alt="The reference screenshot the clone was built from"></div>
+      <img src="assets/nebula-clone.png" alt="The dashboard clone the plugin built, rendered">
+      <div class="after"><img src="assets/nebula-dashboard.png" alt="The reference dashboard the clone was built from"></div>
       <span class="tag left">Reference</span>
-      <span class="tag right">Clone · 99.8%</span>
+      <span class="tag right">Clone · 98.5%</span>
       <div class="handle"><span class="knob">↔</span></div>
       <div class="split-line"></div>
       <input type="range" min="0" max="100" value="50" aria-label="Compare the reference and the clone">
     </div>
-    <p class="compare-cap">A billing card, 520×360, built in one lane: one file, no assets, no JS. The bigger run — a sign-in screen with a photo-free illustration — landed at 92.7% and is <a href="demo/">open in the browser</a> too.</p>
+    <p class="compare-cap">A dense observability dashboard — sidebar, KPI cards with sparklines, a layered area chart, a donut, a data table — rebuilt from one screenshot in 1280×800. <a href="demo/nebula/">Open the clone</a>.</p>
 
     <div class="scores">
       <div class="score-card reveal">
-        <div class="ring" data-score="92.7">
+        <div class="ring" data-score="98.5">
           <svg width="72" height="72" viewBox="0 0 72 72"><defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8fb0ff"/><stop offset="1" stop-color="#35d07f"/></linearGradient></defs><circle class="track" cx="36" cy="36" r="30"/><circle class="bar" cx="36" cy="36" r="30"/></svg>
-          <b>92.7%</b>
+          <b>98.5%</b>
         </div>
-        <p><strong>Sign-in screen</strong>900×620 reference · one adopted lane · rendered at the reference's own size</p>
+        <p><strong>Nebula dashboard</strong>1280×800 · two lanes raced · winner rendered and compared at the reference's own size</p>
       </div>
       <div class="score-card reveal">
-        <div class="ring" data-score="99.8">
+        <div class="ring" data-score="98">
           <svg width="72" height="72" viewBox="0 0 72 72"><circle class="track" cx="36" cy="36" r="30"/><circle class="bar" cx="36" cy="36" r="30"/></svg>
-          <b>99.8%</b>
+          <b>98%</b>
         </div>
-        <p><strong>Billing card</strong>520×360 reference · the lane's own layout spec paid off · one file, no assets</p>
+        <p><strong>Aperture landing</strong>1280×800 · one lane · glass panels, gradient mesh, feature grid, footer</p>
       </div>
       <div class="score-card reveal">
         <div style="width:72px;height:72px;flex:none;display:grid;place-items:center;border-radius:50%;border:1px dashed var(--border-strong);color:var(--label-3);font-size:11px;text-align:center;line-height:1.2">you<br>choose</div>
         <p><strong>Score suggests, you decide</strong>The percentage ranks attempts. It never certifies a page — that is your call.</p>
       </div>
+    </div>
+  </section>
+
+
+  <section id="examples">
+    <p class="kick">More runs</p>
+    <h2>Three screens, one command each</h2>
+    <p class="sub">Every page below was built by this plugin from the screenshot next to it. Open any of them — they are static, so they just run.</p>
+    <div class="gallery">
+      <a class="ex reveal" href="demo/nebula/">
+        <img src="assets/nebula-clone.png" alt="Nebula dashboard clone" loading="lazy">
+        <span class="ex-meta"><b>Nebula — AI observability</b><i>98.5% · 1280×800 · 3 files</i></span>
+      </a>
+      <a class="ex reveal" href="demo/aperture/">
+        <img src="assets/aperture-clone.png" alt="Aperture landing clone" loading="lazy">
+        <span class="ex-meta"><b>Aperture — landing page</b><i>98% · 1280×800 · 1 file</i></span>
+      </a>
+      <a class="ex reveal" href="demo/card.html">
+        <img src="assets/card-clone.png" alt="Billing card clone" loading="lazy">
+        <span class="ex-meta"><b>Billing card</b><i>99.8% · 520×360 · 1 file</i></span>
+      </a>
+      <a class="ex reveal" href="demo/">
+        <img src="demo/preview.png" alt="Sign-in screen clone" loading="lazy">
+        <span class="ex-meta"><b>Sign-in screen</b><i>92.7% · 900×620 · 3 files</i></span>
+      </a>
     </div>
   </section>
 

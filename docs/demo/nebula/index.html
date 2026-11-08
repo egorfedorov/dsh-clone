@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nebula — Overview</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-text">
+        <span class="brand-name">Nebula</span>
+        <span class="brand-sub">observability</span>
+      </span>
+    </div>
+
+    <nav class="nav" aria-label="Primary">
+      <a class="nav-item is-active" href="#overview" aria-current="page">
+        <span class="nav-glyph" aria-hidden="true"></span><span>Overview</span>
+      </a>
+      <a class="nav-item" href="#traces">
+        <span class="nav-glyph" aria-hidden="true"></span><span>Traces</span>
+      </a>
+      <a class="nav-item" href="#models">
+        <span class="nav-glyph" aria-hidden="true"></span><span>Models</span>
+      </a>
+      <a class="nav-item" href="#datasets">
+        <span class="nav-glyph" aria-hidden="true"></span><span>Datasets</span>
+      </a>
+      <a class="nav-item" href="#alerts">
+        <span class="nav-glyph" aria-hidden="true"></span><span>Alerts</span>
+      </a>
+      <a class="nav-item" href="#settings">
+        <span class="nav-glyph" aria-hidden="true"></span><span>Settings</span>
+      </a>
+    </nav>
+
+    <div class="account">
+      <div class="account-avatar" aria-hidden="true"><span>AK</span></div>
+      <div class="account-body">
+        <div class="account-name">Ava Kessler</div>
+        <div class="account-role">platform admin</div>
+        <span class="oncall"><i aria-hidden="true"></i>on-call this week</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="page-head">
+      <div class="page-title">
+        <h1>Overview</h1>
+        <p class="page-sub">prod <span class="sep">·</span> eu-central <span class="sep">·</span> last 24 hours</p>
+      </div>
+
+      <div class="tools">
+        <label class="search">
+          <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+            <path d="M2.5 4.2h11M2.5 8h11M2.5 11.8h6.5"/>
+          </svg>
+          <input type="search" placeholder="Search traces, models, users..." aria-label="Search traces, models and users">
+        </label>
+
+        <button class="range" type="button" aria-haspopup="listbox">
+          <span>Last 24h</span>
+          <svg class="icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+            <path d="M3 4.5h10M4.6 8h6.8M6.4 11.5h3.2"/>
+          </svg>
+        </button>
+
+        <div class="avatar-stack" aria-label="Three collaborators online">
+          <span class="chip chip-pink"></span>
+          <span class="chip chip-blue"></span>
+          <span class="chip chip-green"></span>
+        </div>
+
+        <button class="add-btn" type="button" aria-label="Create new">
+          <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <path d="M8 3.2v9.6M3.2 8h9.6"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <section class="kpis" aria-label="Key metrics">
+      <article class="card kpi">
+        <span class="kpi-label">Requests</span>
+        <span class="kpi-value">18.4M</span>
+        <div class="delta green">
+          <svg viewBox="0 0 10 10" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 7.4 7.4 2.6M3.6 2.6h3.8v3.8"/></svg>
+          +12.6%
+        </div>
+        <svg class="spark" viewBox="0 0 112 44" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="spark1" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#34d399" stop-opacity=".26"/>
+              <stop offset="1" stop-color="#34d399" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M0 40 L9 41 L15 35 L23 38 L30 30 L37 33 L45 24 L52 28 L60 19 L68 22 L75 14 L83 17 L91 10 L99 13 L112 5 L112 44 L0 44 Z" fill="url(#spark1)"/>
+          <path d="M0 40 L9 41 L15 35 L23 38 L30 30 L37 33 L45 24 L52 28 L60 19 L68 22 L75 14 L83 17 L91 10 L99 13 L112 5" fill="none" stroke="#34d399" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+      </article>
+
+      <article class="card kpi">
+        <span class="kpi-label">p95 latency</span>
+        <span class="kpi-value">412 ms</span>
+        <div class="delta green">
+          <svg viewBox="0 0 10 10" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7.4 2.6 2.6 7.4M6.4 7.4H2.6V3.6"/></svg>
+          −38 ms
+        </div>
+        <svg class="spark" viewBox="0 0 112 44" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="spark2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#22d3ee" stop-opacity=".24"/>
+              <stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M0 8 L9 6 L17 15 L25 10 L33 24 L41 18 L49 28 L57 26 L65 33 L73 30 L81 36 L89 32 L97 37 L105 35 L112 38 L112 44 L0 44 Z" fill="url(#spark2)"/>
+          <path d="M0 8 L9 6 L17 15 L25 10 L33 24 L41 18 L49 28 L57 26 L65 33 L73 30 L81 36 L89 32 L97 37 L105 35 L112 38" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+      </article>
+
+      <article class="card kpi">
+        <span class="kpi-label">Error rate</span>
+        <span class="kpi-value">0.42%</span>
+        <div class="delta amber">
+          <svg viewBox="0 0 10 10" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2.6 7.4 7.4 2.6M3.6 2.6h3.8v3.8"/></svg>
+          +0.06%
+        </div>
+        <svg class="spark" viewBox="0 0 112 44" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="spark3" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#fbbf24" stop-opacity=".22"/>
+              <stop offset="1" stop-color="#fbbf24" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M0 38 L9 34 L17 37 L25 27 L33 30 L41 20 L49 24 L57 15 L65 19 L73 9 L81 14 L89 6 L97 11 L105 4 L112 6 L112 44 L0 44 Z" fill="url(#spark3)"/>
+          <path d="M0 38 L9 34 L17 37 L25 27 L33 30 L41 20 L49 24 L57 15 L65 19 L73 9 L81 14 L89 6 L97 11 L105 4 L112 6" fill="none" stroke="#fbbf24" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+      </article>
+
+      <article class="card kpi">
+        <span class="kpi-label">Cost /1k</span>
+        <span class="kpi-value">$0.019</span>
+        <div class="delta green">
+          <svg viewBox="0 0 10 10" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7.4 2.6 2.6 7.4M6.4 7.4H2.6V3.6"/></svg>
+          −8.1%
+        </div>
+        <svg class="spark" viewBox="0 0 112 44" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="spark4" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#34d399" stop-opacity=".22"/>
+              <stop offset="1" stop-color="#34d399" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M0 7 L9 10 L17 8 L25 16 L33 13 L41 20 L49 17 L57 24 L65 21 L73 28 L81 26 L89 31 L97 29 L105 36 L112 33 L112 44 L0 44 Z" fill="url(#spark4)"/>
+          <path d="M0 7 L9 10 L17 8 L25 16 L33 13 L41 20 L49 17 L57 24 L65 21 L73 28 L81 26 L89 31 L97 29 L105 36 L112 33" fill="none" stroke="#34d399" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+      </article>
+    </section>
+
+    <section class="mid">
+      <article class="card chart-card">
+        <header class="card-head">
+          <div>
+            <h2>Latency distribution</h2>
+            <p>p50 / p95 / p99 across 6 services</p>
+          </div>
+          <ul class="legend" aria-label="Series">
+            <li><span class="key key-p50"></span>p50</li>
+            <li><span class="key key-p95"></span>p95</li>
+            <li><span class="key key-p99"></span>p99</li>
+          </ul>
+        </header>
+        <div class="chart" id="latency-chart" role="img" aria-label="Latency over the last 24 hours: p99 peaks near 545 milliseconds at 12:00 and declines to about 150 milliseconds by 20:00."></div>
+      </article>
+
+      <article class="card spend-card">
+        <header class="card-head">
+          <div>
+            <h2>Token spend</h2>
+            <p>by model family</p>
+          </div>
+        </header>
+
+        <div class="donut-wrap">
+          <svg class="donut" viewBox="0 0 104 104" aria-hidden="true">
+            <g transform="rotate(-90 52 52)" fill="none" stroke-width="18">
+              <circle cx="52" cy="52" r="42" pathLength="100" stroke="#8b5cf6" stroke-dasharray="44.8 55.2" stroke-dashoffset="0"/>
+              <circle cx="52" cy="52" r="42" pathLength="100" stroke="#22d3ee" stroke-dasharray="26.6 73.4" stroke-dashoffset="-46.4"/>
+              <circle cx="52" cy="52" r="42" pathLength="100" stroke="#34d399" stroke-dasharray="16.6 83.4" stroke-dashoffset="-74.6"/>
+              <circle cx="52" cy="52" r="42" pathLength="100" stroke="#fbbf24" stroke-dasharray="6 94" stroke-dashoffset="-92.8"/>
+            </g>
+          </svg>
+          <div class="donut-center">
+            <strong>$3.8k</strong>
+            <span>total</span>
+          </div>
+        </div>
+
+        <ul class="spend-list">
+          <li class="spend-row" style="--swatch:#8b5cf6">
+            <span class="swatch"></span>
+            <span class="spend-name">deepseek-v4</span>
+            <span class="meter">
+              <span class="pct">46%</span>
+              <span class="track"><i style="width:46%"></i></span>
+            </span>
+          </li>
+          <li class="spend-row" style="--swatch:#22d3ee">
+            <span class="swatch"></span>
+            <span class="spend-name">kim-k3</span>
+            <span class="meter">
+              <span class="pct">28%</span>
+              <span class="track"><i style="width:28%"></i></span>
+            </span>
+          </li>
+          <li class="spend-row" style="--swatch:#34d399">
+            <span class="swatch"></span>
+            <span class="spend-name">qwen-4</span>
+            <span class="meter">
+              <span class="pct">18%</span>
+              <span class="track"><i style="width:18%"></i></span>
+            </span>
+          </li>
+          <li class="spend-row" style="--swatch:#fbbf24">
+            <span class="swatch"></span>
+            <span class="spend-name">other</span>
+            <span class="meter">
+              <span class="pct">8%</span>
+              <span class="track"><i style="width:8%"></i></span>
+            </span>
+          </li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="card table-card" aria-labelledby="slowest-title">
+      <div class="table-head">
+        <h2 id="slowest-title">Slowest traces</h2>
+        <button class="console-btn" type="button">Open in console</button>
+      </div>
+
+      <div class="table-scroll">
+        <table class="traces">
+          <colgroup>
+            <col style="width:184px">
+            <col style="width:191px">
+            <col style="width:171px">
+            <col style="width:130px">
+            <col style="width:129px">
+            <col>
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col">Trace</th>
+              <th scope="col">Service</th>
+              <th scope="col">Model</th>
+              <th scope="col">Tokens</th>
+              <th scope="col">Latency</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="trace-id">4f8e2c91</td>
+              <td>gateway</td>
+              <td>deepseek-v4</td>
+              <td class="tokens">18.4k</td>
+              <td class="latency amber"><span>412</span> <small>ms</small></td>
+              <td class="status-cell">
+                <span class="gauge"><i class="amber" style="width:36px"></i></span>
+                <span class="pill ok">ok</span>
+              </td>
+            </tr>
+            <tr>
+              <td class="trace-id">a12b7e04</td>
+              <td>retriever</td>
+              <td>kim-k3</td>
+              <td class="tokens">9.2k</td>
+              <td class="latency amber"><span>890</span> <small>ms</small></td>
+              <td class="status-cell">
+                <span class="gauge"><i class="amber" style="width:62px"></i></span>
+                <span class="pill slow">slow</span>
+              </td>
+            </tr>
+            <tr>
+              <td class="trace-id">c90e3f55</td>
+              <td>summariser</td>
+              <td>deepseek-v4</td>
+              <td class="tokens">31.0k</td>
+              <td class="latency amber"><span>1240</span> <small>ms</small></td>
+              <td class="status-cell">
+                <span class="gauge"><i class="amber" style="width:70px"></i></span>
+                <span class="pill slow">slow</span>
+              </td>
+            </tr>
+            <tr>
+              <td class="trace-id">77bd1180</td>
+              <td>router</td>
+              <td>qwen-4</td>
+              <td class="tokens">2.1k</td>
+              <td class="latency green"><span>96</span> <small>ms</small></td>
+              <td class="status-cell">
+                <span class="gauge"><i class="green" style="width:34px"></i></span>
+                <span class="pill ok">ok</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -59,21 +59,16 @@ The usual flow is still: describe it, get one attempt, describe the differences,
 
 ## Demo
 
-A real run, not a mock: one command, one lane adopted, no retries.
+Real runs, not mocks: one command each, no retries, no hand edits. Every page is a static file — open it and it runs.
 
-| | |
-|---|---|
-| **Reference** — what the person pasted | <img src="docs/assets/reference.png" alt="reference sign-in screen" width="420"> |
-| **The clone** — rendered by the plugin from the adopted lane | <img src="docs/demo/preview.png" alt="the adopted clone, rendered" width="420"> |
-| **Result** | **92.7% picture match** · plain HTML + CSS + JS · [open it live](https://egorfedorov.github.io/dsh-clone/demo/) |
+| Reference | The clone, rendered by the plugin | Result |
+|---|---|---|
+| <img src="docs/assets/nebula-dashboard.png" alt="reference observability dashboard" width="330"> | <img src="docs/assets/nebula-clone.png" alt="the dashboard clone, rendered" width="330"> | **98.5% match** · 1280×800 · two lanes raced, the better one adopted · [open it](https://egorfedorov.github.io/dsh-clone/demo/nebula/) |
+| <img src="docs/assets/aperture-landing.png" alt="reference landing page" width="330"> | <img src="docs/assets/aperture-clone.png" alt="the landing clone, rendered" width="330"> | **98% match** · 1280×800 · one lane · [open it](https://egorfedorov.github.io/dsh-clone/demo/aperture/) |
+| <img src="docs/assets/card-reference.png" alt="reference billing card" width="330"> | <img src="docs/assets/card-clone.png" alt="the billing card clone, rendered" width="330"> | **99.8% match** · 520×360 · one file · [open it](https://egorfedorov.github.io/dsh-clone/demo/card.html) |
+| <img src="docs/assets/reference.png" alt="reference sign-in screen" width="330"> | <img src="demo/preview.png" alt="the sign-in clone, rendered" width="330"> | **92.7% match** · 900×620 · [open it](https://egorfedorov.github.io/dsh-clone/demo/) |
 
-A second run, a different shape — a small billing card, where the builder's own layout spec paid off:
-
-| | |
-|---|---|
-| **Reference** | <img src="docs/assets/card-reference.png" alt="reference billing card" width="360"> |
-| **The clone** — rendered by the plugin | <img src="docs/assets/card-clone.png" alt="the billing card clone, rendered" width="360"> |
-| **Result** | **99.8% picture match** · one file, no assets, no JS · [open it live](https://egorfedorov.github.io/dsh-clone/demo/card.html) |
+The dashboard and the landing page are the interesting ones: a sidebar, KPI cards with sparklines, a layered area chart, a donut, a data table; glass panels over a gradient mesh, a feature grid and a footer. Both were rebuilt from a single screenshot.
 
 The score is the plugin's own: the rendered page and the reference are averaged into a coarse colour grid and compared. It measures *how much of the picture agrees*, not whether the page is correct — see [Honest limits](#honest-limits).
 
@@ -221,12 +216,13 @@ test/render-score.mjs  real render + score through the plugin's own path
 index.json          Format-1 plugin market index (Custom plugin indexes)
 screenshots.json    Storefront screenshots (read by dsh-market)
 tools/make-hero.py  Regenerates docs/assets/hero.png
+tools/make-references.py  Regenerates the showcase reference screenshots
 tools/make-icon.py  Regenerates the storefront icon
 tools/make-demo.py  Regenerates docs/assets/demo.gif
 docs/PUBLISHING.md  npm, the awesome list, indexes, the official program
 docs/storefront/    Ready-to-submit entry for awesome-dsh-plugin
 docs/index.html     GitHub Pages landing page
-docs/demo/          A real clone, served live
+docs/demo/          Four real clones, served live
 docs/ARCHITECTURE.md
 ACCEPTABLE-USE.md
 ```

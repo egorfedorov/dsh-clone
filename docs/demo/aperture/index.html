@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<!--
+  APERTURE LANDING — LAYOUT SPEC (inferred from reference.png, 1280x800)
+
+  REGIONS (top to bottom)
+  1. Floating nav pill: x 28–1252, y 24–84 (60px tall, 16px radius), glass on a
+     blue-violet glow. Brand left, 4 links offset 107px after brand, auth buttons right.
+  2. Hero, 2 columns, aligned on a 1120px content column starting x=80:
+     - copy column 500px (h1 339px wide, lede 296px)
+     - glass preview card 620px x 420px, starts x=600 (20px bleed past right margin)
+     - hero top y=140; card top y=140; buttons y=452; avatars y=520.
+  3. Feature row: three 232x146 cards, gap 20, y 582–728, left aligned at x=80.
+  4. Footer: 5-column line of muted links (steps of 148px) + copyright flush right,
+     text baseline y≈776, 22px bottom padding.
+
+  GRID / SPACING SCALE (px): 2, 4, 6, 8, 10, 12, 14, 16, 20, 22, 24, 28, 32, 56, 60.
+  Content shell 1120 wide centred; nav inset 28; card inner padding 20; card body
+  inset 7; feature padding 19/17.
+
+  PALETTE (sampled hex)
+  page base            #05070d
+  top blue glow        #2e3171 (at 76% -6%, fading out)
+  bottom-right magenta #421a36
+  lower-left teal wash #0b1b1d
+  nav glass            rgba(15,18,34,.72→.80)
+  hairline border      rgba(255,255,255,.08) / card #3a3d4d
+  preview card         #151a2d
+  heading white        #f2f3f6
+  accent lavender      #a78bfa
+  body text            #8b98ad
+  faint / footnotes    #68748a
+  swatches             #8b5cf6  #6366f1  #22d3ee  #34d399  #fbbf24  #f43f5e
+  green generate btn   #34d399
+  avatar dots          #f472b6  #5ea7fa  #34d399  #fbbf24
+
+  TYPE SCALE
+  h1 51px / 60px, weight 400, tracking -0.002em
+  eyebrow 7px, tracking .1em, uppercase, 600
+  lede 12px / 22px (3 hard-broken lines)
+  nav + card labels 12.5 / 11.5px
+  feature title 13px / 16px, 500; feature body 9.3px / 15px
+  footer 9.5px
+  trust 11.5px + 8.5px meta
+
+  RADII: nav 16, preview card 22, feature cards 14, CTA 10, card buttons 10,
+  inputs/small buttons 8, swatches 13, logo/icon tiles 7–9.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aperture — Design systems that build themselves</title>
+<style>
+  :root{
+    --bg:#05070d;
+    --ink:#f2f3f6;
+    --lav:#a78bfa;
+    --muted:#8b98ad;
+    --dim:#68748a;
+    --violet:#8b5cf6;
+    --green:#34d399;
+    --line:rgba(255,255,255,.08);
+    --card:#151a2d;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    min-height:100vh;
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Helvetica,Arial,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    background:
+      radial-gradient(ellipse 360px 320px at 66% 0%, rgba(86,94,215,.60), rgba(86,94,215,0) 100%),
+      radial-gradient(ellipse 600px 450px at 45% 25%, rgba(40,48,100,.30), rgba(40,48,100,0) 100%),
+      radial-gradient(circle 520px at 101% 103%, rgba(210,70,130,.36), rgba(210,70,130,0) 100%),
+      radial-gradient(ellipse 600px 260px at 45% 115%, rgba(22,38,78,.30), rgba(22,38,78,0) 100%),
+      radial-gradient(ellipse 300px 450px at 0% 80%, rgba(25,110,100,.10), rgba(25,110,100,0) 100%),
+      var(--bg);
+    background-color:var(--bg);
+    background-attachment:fixed;
+    overflow-x:hidden;
+  }
+  a{color:inherit;text-decoration:none}
+  button{font-family:inherit}
+  .page{
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    padding:24px 28px 0;
+    position:relative;
+  }
+  .wrap{width:1120px;max-width:100%;margin:0 auto}
+
+  /* ---------- nav ---------- */
+  .nav{
+    flex:none;
+    height:60px;
+    display:flex;
+    align-items:center;
+    padding:0 20px 0 22px;
+    border:1px solid var(--line);
+    border-radius:16px;
+    background:linear-gradient(180deg,rgba(15,19,34,.72),rgba(9,12,22,.80));
+    -webkit-backdrop-filter:blur(20px) saturate(120%);
+    backdrop-filter:blur(20px) saturate(120%);
+    box-shadow:0 24px 60px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.055);
+    position:relative;
+    z-index:10;
+  }
+  .brand{display:flex;align-items:center;gap:7px;flex:none}
+  .logo{
+    width:27px;height:27px;border-radius:9px;
+    display:grid;place-items:center;
+    background:linear-gradient(145deg,#9868ff 0%,#7c56f6 55%,#5b43d8 100%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.30), 0 6px 16px rgba(109,78,240,.35);
+  }
+  .brand-name{font-size:17px;font-weight:500;letter-spacing:-.02em;color:#eef0f6}
+  .nav-links{display:flex;align-items:center;gap:57px;margin-left:101px}
+  .nav-links a{font-size:12.5px;color:#a9b1c2;transition:color .18s ease}
+  .nav-links a:hover{color:#f1f3f8}
+  .nav-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .btn-sm{
+    height:30px;padding:0;
+    display:inline-flex;align-items:center;justify-content:center;
+    border-radius:8px;font-size:11.5px;line-height:1;
+    border:1px solid transparent;white-space:nowrap;
+    transition:background .18s ease,border-color .18s ease;
+  }
+  .btn-signin{width:77px;border-color:rgba(255,255,255,.11);background:rgba(255,255,255,.02);color:#d1d7e3}
+  .btn-signin:hover{background:rgba(255,255,255,.06)}
+  .btn-access{width:74px;background:#f7f7f8;color:#0a0c12;font-weight:500}
+  .btn-access:hover{background:#fff}
+
+  main{flex:1 1 auto}
+
+  /* ---------- hero ---------- */
+  .hero{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 620px;
+    gap:20px;
+    align-items:start;
+    margin-top:56px;
+    margin-right:-20px;
+  }
+  .hero-copy{padding-top:9px;max-width:500px}
+  .eyebrow{
+    margin:0;
+    font-size:7px;line-height:1.3;font-weight:600;
+    letter-spacing:.1em;text-transform:uppercase;
+    color:#7c83b8;
+  }
+  h1{
+    margin:18px 0 0;
+    font-size:51px;line-height:60px;
+    font-weight:400;letter-spacing:-.002em;
+    color:#f2f3f6;
+  }
+  h1 .accent{color:var(--lav)}
+  .lede{
+    margin:13px 0 0;
+    font-size:12px;line-height:22px;
+    color:var(--muted);max-width:380px;
+    letter-spacing:-.004em;
+    transform:scaleX(.96);transform-origin:left top;
+  }
+  .cta-row{margin-top:17px;display:flex;gap:11px;align-items:center}
+  .btn-cta{
+    height:46px;border-radius:10px;
+    display:inline-flex;align-items:center;justify-content:center;gap:9px;
+    font-size:13.5px;line-height:1;cursor:pointer;
+    transition:transform .18s ease, background .18s ease, border-color .18s ease;
+  }
+  .btn-cta:active{transform:translateY(1px)}
+  .btn-start{width:168px;background:#f4f5f5;color:#0a0c10;border:1px solid #f4f5f5}
+  .btn-start:hover{background:#fff}
+  .btn-demo{width:162px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.13);color:#e7e9f0}
+  .btn-demo:hover{background:rgba(255,255,255,.06)}
+  .arrow{flex:none;display:block}
+
+  .trust{margin-top:22px;display:flex;align-items:center;gap:24px}
+  .avatars{display:flex;align-items:center}
+  .avatar{
+    width:28px;height:28px;border-radius:50%;
+    border:2px solid #070a12;flex:none;
+    box-shadow:inset 0 -3px 6px rgba(0,0,0,.22), inset 0 1px 1px rgba(255,255,255,.28);
+  }
+  .avatar+.avatar{margin-left:-4px}
+  .av-pink{background:linear-gradient(160deg,#f9a8d4,#f472b6)}
+  .av-blue{background:linear-gradient(160deg,#93c5fd,#5ea7fa)}
+  .av-green{background:linear-gradient(160deg,#6ee7b7,#34d399)}
+  .av-yellow{background:linear-gradient(160deg,#fcd34d,#fbbf24)}
+  .trust-copy{display:flex;flex-direction:column;gap:7px}
+  .trust-title{font-size:10px;line-height:1.2;color:#a8b2c3;white-space:nowrap}
+  .trust-sub{font-size:7.8px;line-height:1.2;letter-spacing:0;color:#667387;white-space:nowrap}
+
+  /* ---------- glass preview card ---------- */
+  .preview{
+    position:relative;
+    width:620px;height:420px;
+    padding:19px 20px 14px;
+    border-radius:22px;
+    border:1px solid rgba(255,255,255,.10);
+    background:
+      radial-gradient(120% 85% at 10% 0%, rgba(70,80,136,.08), rgba(70,80,136,0) 55%),
+      linear-gradient(165deg, rgba(22,28,49,.90), rgba(16,21,38,.94));
+    -webkit-backdrop-filter:blur(26px) saturate(120%);
+    backdrop-filter:blur(26px) saturate(120%);
+    box-shadow:
+      0 40px 90px rgba(0,0,0,.55),
+      0 1px 0 rgba(255,255,255,.06) inset,
+      0 0 0 1px rgba(255,255,255,.02);
+  }
+  .preview::before{
+    content:"";
+    position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:linear-gradient(150deg, rgba(255,255,255,.14), rgba(255,255,255,0) 32%, rgba(255,255,255,0) 72%, rgba(255,255,255,.05));
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;
+    mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite:exclude;
+    padding:1px;
+  }
+  .window-bar{
+    height:33px;border-radius:9px;
+    border:1px solid rgba(255,255,255,.07);
+    background:rgba(255,255,255,.022);
+    display:flex;align-items:center;padding:0 12px;gap:6px;
+  }
+  .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .dot-r{background:#f87171}
+  .dot-y{background:#fbbf24}
+  .dot-g{background:#34d399}
+  .crumbs{
+    margin-left:16px;
+    display:flex;align-items:center;gap:8px;
+    font-size:8.5px;letter-spacing:.08em;color:#6b7590;
+  }
+  .crumbs .sep{color:#3b4257}
+  .card-body{padding:0 7px}
+  .card-label{
+    margin:0;
+    font-size:10.7px;line-height:14px;font-weight:500;
+    color:#cdd3e0;white-space:nowrap;
+  }
+  .card-label.first{margin-top:18px}
+  .swatches{display:flex;gap:9.5px;margin-top:5px}
+  .swatch{
+    width:44.5px;height:52px;border-radius:13px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.28), inset 0 -2px 4px rgba(0,0,0,.10), 0 6px 14px rgba(0,0,0,.16);
+  }
+  .sw-1{background:linear-gradient(165deg,#9d6ffb,#8b5cf6)}
+  .sw-2{background:linear-gradient(165deg,#7779f5,#6366f1)}
+  .sw-3{background:linear-gradient(165deg,#3dddf2,#22d3ee)}
+  .sw-4{background:linear-gradient(165deg,#46e0a8,#34d399)}
+  .sw-5{background:linear-gradient(165deg,#fbc83f,#fbbf24)}
+  .sw-6{background:linear-gradient(165deg,#fb5670,#f43f5e)}
+  .card-label.components{margin-top:33px}
+  .comp-row{display:flex;gap:12px;margin-top:10px}
+  .btn-primary-card{
+    width:163px;height:43px;border-radius:10px;border:1px solid rgba(255,255,255,.14);
+    background:linear-gradient(180deg,#9465fa,#8b5cf6);
+    color:#f8f5ff;font-size:11.5px;font-weight:400;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 8px 20px rgba(139,92,246,.20);
+    cursor:pointer;white-space:nowrap;
+  }
+  .btn-primary-card:hover{background:linear-gradient(180deg,#9d72fc,#9061f9)}
+  .btn-secondary-card{
+    width:133px;height:43px;border-radius:10px;border:1px solid #2c3246;
+    background:rgba(255,255,255,.012);color:#c4cad8;font-size:11.5px;
+    cursor:pointer;white-space:nowrap;
+  }
+  .btn-secondary-card:hover{background:rgba(255,255,255,.045)}
+  .gen-row{display:flex;gap:11px;margin-top:12px}
+  .email{
+    flex:1 1 auto;min-width:0;height:37px;border-radius:8px;
+    border:1px solid #262d41;background:rgba(255,255,255,.02);
+    color:#dfe4ee;font-size:10.5px;padding:0 13px;
+    font-family:inherit;outline:none;
+    transition:border-color .18s ease, background .18s ease;
+  }
+  .email::placeholder{color:#5b6579;letter-spacing:.01em}
+  .email:focus{border-color:#3b4666;background:rgba(255,255,255,.035)}
+  .btn-generate{
+    flex:none;width:171px;height:37px;border-radius:8px;border:1px solid rgba(255,255,255,.14);
+    background:linear-gradient(180deg,#46dfa6,#34d399);
+    color:#06271c;font-size:11.5px;font-weight:500;
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.35);
+    cursor:pointer;white-space:nowrap;
+  }
+  .btn-generate:hover{background:linear-gradient(180deg,#53e7b0,#3ee0a4)}
+  .card-label.graph{margin-top:18px}
+  .chart{display:block;width:100%;height:77px;margin-top:9px;overflow:visible}
+
+  /* ---------- feature cards ---------- */
+  .features{
+    margin-top:22px;
+    display:grid;
+    grid-template-columns:repeat(3,232px);
+    gap:20px;
+  }
+  .feature{
+    height:146px;
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,.065);
+    background:linear-gradient(168deg,rgba(255,255,255,.030),rgba(255,255,255,.006) 60%,rgba(255,255,255,.015));
+    padding:19px 2px 19px 17px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+  }
+  .fi{
+    width:24px;height:24px;border-radius:7px;
+    display:grid;place-items:center;
+    border:1px solid;
+  }
+  .fi-1{color:#818cf8;background:rgba(129,140,248,.12);border-color:rgba(129,140,248,.30)}
+  .fi-2{color:#22d3ee;background:rgba(34,211,238,.11);border-color:rgba(34,211,238,.28)}
+  .fi-3{color:#34d399;background:rgba(52,211,153,.11);border-color:rgba(52,211,153,.28)}
+  .feature h2{
+    margin:18px 0 0;
+    font-size:13px;line-height:16px;font-weight:500;
+    color:#e3e7ee;letter-spacing:-.005em;
+  }
+  .feature p{
+    margin:8px 0 0;
+    font-size:9.3px;line-height:15px;
+    color:#7b8799;max-width:213px;transform:scaleX(.94);transform-origin:left top;
+  }
+
+  /* ---------- footer ---------- */
+  footer{flex:none;padding:0 0 20px}
+  .footer-inner{
+    display:grid;
+    grid-template-columns:repeat(4,148px) 1fr;
+    align-items:center;
+    font-size:9.5px;line-height:14px;
+    color:#5a6679;
+  }
+  .footer-inner a{justify-self:start;transition:color .18s ease}
+  .footer-inner a:hover{color:#aab4c5}
+  .copyright{justify-self:end;color:#59657a}
+
+  /* ---------- responsive ---------- */
+  @media (max-width:1200px){
+    .wrap{width:100%}
+    .hero{margin-right:0;grid-template-columns:minmax(0,1fr) minmax(0,620px)}
+    .preview{width:100%}
+    .features{grid-template-columns:repeat(3,minmax(0,1fr))}
+  }
+  @media (max-width:1040px){
+    .nav-links{margin-left:60px;gap:34px}
+    .hero{grid-template-columns:minmax(0,1fr);gap:44px}
+    .hero-copy{max-width:none}
+    .preview{max-width:620px}
+    .features{grid-template-columns:repeat(3,minmax(0,1fr))}
+  }
+  @media (max-width:820px){
+    .page{padding:16px 16px 0}
+    .nav{height:56px;padding:0 14px}
+    .nav-links{display:none}
+    .hero{margin-top:40px}
+    h1{font-size:42px;line-height:50px}
+    .lede{transform:none}
+    .btn-start,.btn-demo{width:auto;padding:0 22px}
+    .features{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .footer-inner{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px}
+    .copyright{grid-column:1/-1;justify-self:start;margin-top:4px}
+  }
+  @media (max-width:560px){
+    h1{font-size:34px;line-height:41px}
+    .preview{height:auto;padding:14px 12px 12px}
+    .comp-row{flex-wrap:wrap}
+    .btn-primary-card,.btn-secondary-card{flex:1 1 140px;width:auto}
+    .gen-row{flex-wrap:wrap}
+    .btn-generate{width:100%}
+    .swatches{gap:7px}
+    .swatch{width:calc((100% - 35px)/6);height:44px;border-radius:10px}
+    .trust{gap:16px}
+    .trust-title,.trust-sub{white-space:normal}
+    .features{grid-template-columns:1fr}
+    .feature{height:auto;padding-bottom:22px}
+    .feature p{max-width:none}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="nav">
+    <a class="brand" href="#" aria-label="Aperture home">
+      <span class="logo" aria-hidden="true">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M4.1 2.7 9.5 6l-5.4 3.3V2.7Z" fill="#fff" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="brand-name">aperture</span>
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#">Product</a>
+      <a href="#">Customers</a>
+      <a href="#">Pricing</a>
+      <a href="#">Docs</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn-sm btn-signin" href="#">Sign in</a>
+      <a class="btn-sm btn-access" href="#">Get access</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Ship visuals at the speed of thought</p>
+          <h1>Design systems<br>that build<br><span class="accent">themselves.</span></h1>
+          <p class="lede">Aperture turns a reference into production<br class="lb"> components: type, spacing, colour and behaviour —<br class="lb"> extracted, not guessed.</p>
+          <div class="cta-row">
+            <a class="btn-cta btn-start" href="#">Start free
+              <svg class="arrow" width="15" height="10" viewBox="0 0 15 10" fill="none" aria-hidden="true">
+                <path d="M1 5h12.2M9.2 1.1 13.2 5l-4 3.9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </a>
+            <a class="btn-cta btn-demo" href="#">Watch the demo</a>
+          </div>
+          <div class="trust">
+            <div class="avatars" aria-hidden="true">
+              <span class="avatar av-pink"></span>
+              <span class="avatar av-blue"></span>
+              <span class="avatar av-green"></span>
+              <span class="avatar av-yellow"></span>
+            </div>
+            <div class="trust-copy">
+              <span class="trust-title">Trusted by 4,200 product teams</span>
+              <span class="trust-sub">SOC 2 Type II · 99.99% uptime</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="preview" aria-label="Aperture generated theme preview">
+          <div class="window-bar">
+            <span class="dot dot-r"></span>
+            <span class="dot dot-y"></span>
+            <span class="dot dot-g"></span>
+            <div class="crumbs">
+              <span>aperture</span><span class="sep">/</span><span>theme</span><span class="sep">/</span><span>generated</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <p class="card-label first">Palette extracted</p>
+            <div class="swatches">
+              <span class="swatch sw-1"></span>
+              <span class="swatch sw-2"></span>
+              <span class="swatch sw-3"></span>
+              <span class="swatch sw-4"></span>
+              <span class="swatch sw-5"></span>
+              <span class="swatch sw-6"></span>
+            </div>
+            <p class="card-label components">Components</p>
+            <div class="comp-row">
+              <button class="btn-primary-card" type="button">Primary action</button>
+              <button class="btn-secondary-card" type="button">Secondary</button>
+            </div>
+            <div class="gen-row">
+              <input class="email" type="email" placeholder="Email address" aria-label="Email address">
+              <button class="btn-generate" type="button" data-generate>Generate
+                <svg class="arrow" width="11" height="9" viewBox="0 0 11 9" fill="none" aria-hidden="true">
+                  <path d="M1 4.5h8.2M6.3 1.2 9.5 4.5 6.3 7.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+            <p class="card-label graph">Token graph</p>
+            <svg class="chart" viewBox="0 0 566 77" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#7878f5" stop-opacity=".36"/>
+                  <stop offset="55%" stop-color="#6468c8" stop-opacity=".28"/>
+                  <stop offset="100%" stop-color="#5a5fbe" stop-opacity=".24"/>
+                </linearGradient>
+              </defs>
+              <g stroke="rgba(255,255,255,.045)" stroke-width="1">
+                <line x1="0" y1="12" x2="566" y2="12"/>
+                <line x1="0" y1="32" x2="566" y2="32"/>
+                <line x1="0" y1="52" x2="566" y2="52"/>
+                <line x1="0" y1="72" x2="566" y2="72"/>
+              </g>
+              <path d="M0 70 L22 65 L44 66 L66 60 L88 64 L112 62 L138 57 L166 59 L192 54 L220 58 L248 51 L276 45 L302 49 L330 42 L356 37 L382 41 L410 31 L432 34 L458 24 L480 27 L505 18 L526 20 L548 10 L566 4 L566 77 L0 77 Z" fill="url(#chartFill)"/>
+              <path d="M0 70 L22 65 L44 66 L66 60 L88 64 L112 62 L138 57 L166 59 L192 54 L220 58 L248 51 L276 45 L302 49 L330 42 L356 37 L382 41 L410 31 L432 34 L458 24 L480 27 L505 18 L526 20 L548 10 L566 4"
+                    fill="none" stroke="#9a98fa" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <section class="features">
+        <article class="feature">
+          <span class="fi fi-1" aria-hidden="true">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M2.5 4.2h9M2.5 7h9M2.5 9.8h5.6"/>
+            </svg>
+          </span>
+          <h2>Extract, don't guess</h2>
+          <p>Type scale, spacing rhythm and colour tokens read straight off the reference.</p>
+        </article>
+        <article class="feature">
+          <span class="fi fi-2" aria-hidden="true">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M2.5 4.2h9M2.5 7h9M2.5 9.8h5.6"/>
+            </svg>
+          </span>
+          <h2>Every state</h2>
+          <p>Hover, focus, disabled and error states generated from one picture.</p>
+        </article>
+        <article class="feature">
+          <span class="fi fi-3" aria-hidden="true">
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <path d="M2.5 4.2h9M2.5 7h9M2.5 9.8h5.6"/>
+            </svg>
+          </span>
+          <h2>Ships as code</h2>
+          <p>React, Vue or plain HTML — with the tokens as CSS variables.</p>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap footer-inner">
+      <a href="#">Changelog</a>
+      <a href="#">Security</a>
+      <a href="#">Careers</a>
+      <a href="#">X / Twitter</a>
+      <span class="copyright">© 2026 Aperture Labs</span>
+    </div>
+  </footer>
+</div>
+
+<script>
+  var generate = document.querySelector('[data-generate]');
+  if (generate) {
+    generate.addEventListener('click', function () {
+      var original = generate.innerHTML;
+      generate.textContent = 'Generating…';
+      generate.disabled = true;
+      setTimeout(function () {
+        generate.innerHTML = original;
+        generate.disabled = false;
+      }, 1200);
+    });
+  }
+</script>
+</body>
+</html>
