@@ -59,6 +59,8 @@
   },
   "scripts": {
     "test": "node test/smoke.mjs",
+    "test:git": "node test/git-lane.mjs",
+    "test:all": "node test/smoke.mjs && node test/git-lane.mjs",
     "check": "node --check index.js && node --check client.js && for f in lib/*.js; do node --check \"$f\" || exit 1; done"
   }
 }

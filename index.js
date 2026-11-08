@@ -18,7 +18,7 @@
  */
 
 import { basename, extname, resolve as resolvePath } from 'node:path'
-import { cp, copyFile, mkdir, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { cp, copyFile, mkdir, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { CloneEngine } from './lib/engine.js'
 import { parseCloneArgs, referenceHintOf } from './lib/parse.js'
 import { clampLanes, mediaTypeOf, reasonOf, truncate } from './lib/util.js'
@@ -173,7 +173,7 @@ export async function apply(ctx, rawConfig) {
   const engine = new CloneEngine({
     now: () => Date.now(),
     id: () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}${Math.random()}`),
-    fs: { cp, copyFile, mkdir, readFile, readdir, rm, stat, symlink, writeFile },
+    fs: { cp, copyFile, mkdir, readFile, readdir, realpath, rm, stat, symlink, writeFile },
     git: (args, cwd) => runCommand(['git', ...args], cwd, { timeoutMs: 120_000 }),
     spawnAgent,
     interruptAgent: ({ childId, parent }) => {
