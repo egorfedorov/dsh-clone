@@ -283,6 +283,16 @@ window.__ModuleLoader__.load({
       return `${(total / 1_000_000).toFixed(1)}M`
     }
 
+    /**
+     * Hover text for the similarity score: what was compared, and against what.
+     * The score is a coarse-grid picture comparison, not a correctness verdict.
+     */
+    const scoreTitle = (lane) => [
+      `${lane.score}% picture match with the reference`,
+      'coarse-grid colour comparison of the rendered page, not a correctness check',
+      'views: live page (above) · rendered snapshot',
+    ].join('\n')
+
     // ── lane card ───────────────────────────────────────────────────────────
 
     function LaneCard({ props, clone, lane, onAdopt, busy }) {
@@ -327,6 +337,17 @@ window.__ModuleLoader__.load({
             },
           }, lane.strategyLabel),
           h('span', { key: 'spacer', style: { flex: '1 1 auto' } }),
+          typeof lane.score === 'number'
+            ? h('span', {
+              key: 'score',
+              title: scoreTitle(lane),
+              style: {
+                fontFamily: MONO, fontSize: 10.5, fontWeight: 600,
+                color: lane.score >= 85 ? T.success : lane.score >= 60 ? T.warn : T.error,
+                fontVariantNumeric: 'tabular-nums', flex: 'none',
+              },
+            }, `${lane.score}%`)
+            : null,
           suggested && ready
             ? h(Pill, { key: 'sug', tone: 'success' }, translate(props, 'panel.suggested'))
             : null,

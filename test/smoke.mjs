@@ -20,6 +20,9 @@ import { buildLanePrompt, LANE_STRATEGIES, strategyForLane, DELIVERY_CONTRACT } 
 import { CloneEngine } from '../lib/engine.js'
 import { clampLanes, formatDuration, isImagePath, mediaTypeOf, slugify, totalTokens, truncate, extensionOf } from '../lib/util.js'
 import { mediaTypeFor, parsePreviewPath, safeJoin, sendJson } from '../lib/preview.js'
+import { decodePng, readPngSize } from '../lib/png.js'
+import { GRID, gridOf, gridSimilarity, scoreLabel, scoreRender } from '../lib/score.js'
+import { detectRenderer, resetRendererCache } from '../lib/render.js'
 
 let passed = 0
 const tests = []
@@ -165,8 +168,80 @@ test('rank: delivered lanes lead, earliest finish is the suggestion', () => {
   assert.equal(suggestedWinner(lanes).index, 2)
   assert.deepEqual(rankLanes(lanes).map((lane) => lane.index), [2, 1, 0])
   assert.deepEqual(summarize({ id: 'x', status: 'running', lanes }), {
-    id: 'x', status: 'running', done: 3, total: 3, delivered: 2, winner: null,
+    id: 'x', status: 'running', done: 3, total: 3, delivered: 2, winner: null, bestScore: null,
   })
+})
+
+test('rank: a higher similarity score outranks an earlier finish', () => {
+  const lanes = [
+    { index: 0, status: 'settled', files: [{ path: 'index.html' }], finishedAt: 5, score: 71.2 },
+    { index: 1, status: 'settled', files: [{ path: 'index.html' }], finishedAt: 90, score: 95.5 },
+    { index: 2, status: 'settled', files: [{ path: 'index.html' }], finishedAt: 40, score: null },
+  ]
+  assert.equal(suggestedWinner(lanes).index, 1)
+  assert.deepEqual(rankLanes(lanes).map((lane) => lane.index), [1, 0, 2])
+  assert.equal(summarize({ id: 'x', status: 'finished', lanes }).bestScore, 95.5)
+})
+
+test('rank: unscored lanes still fall back to finish order', () => {
+  const lanes = [
+    { index: 0, status: 'settled', files: [{ path: 'index.html' }], finishedAt: 30, score: null },
+    { index: 1, status: 'settled', files: [{ path: 'index.html' }], finishedAt: 10, score: null },
+  ]
+  assert.equal(suggestedWinner(lanes).index, 1)
+})
+
+// ── pixels and scoring ────────────────────────────────────────────────────
+
+const referencePng = await readFile(new URL('../docs/assets/reference.png', import.meta.url))
+const renderPng = await readFile(new URL('./fixtures/render-lane.png', import.meta.url))
+
+test('png: decodes the demo reference with its real dimensions and pixels', () => {
+  const image = decodePng(referencePng)
+  assert.equal(image.width, 900)
+  assert.equal(image.height, 620)
+  assert.equal(image.data.length, 900 * 620 * 4)
+  assert.deepEqual([...image.data.slice(0, 4)], [244, 241, 234, 255], 'the warm canvas colour')
+})
+
+test('png: the header probe reads the size without inflating', () => {
+  assert.deepEqual(readPngSize(referencePng), { width: 900, height: 620 })
+  assert.equal(readPngSize(Buffer.from('short')), null)
+})
+
+test('png: rejects bytes that are not a supported PNG', () => {
+  assert.throws(() => decodePng(Buffer.from('not a png at all')), /bad signature|too short/u)
+  const truncated = referencePng.subarray(0, 40)
+  assert.throws(() => decodePng(truncated), /truncated|missing IHDR|no image data|image data is short/u)
+})
+
+test('score: an image against itself is a perfect match', () => {
+  assert.equal(scoreRender({ referencePng, renderPng: referencePng }).score, 100)
+  const grid = gridOf(decodePng(referencePng))
+  assert.equal(grid.length, GRID.columns * GRID.rows * 3)
+  assert.equal(gridSimilarity(grid, grid), 100)
+})
+
+test('score: a real lane render scores high against its reference', () => {
+  const { score } = scoreRender({ referencePng, renderPng })
+  assert.ok(score > 90, `expected a strong match, got ${score}`)
+  assert.ok(score <= 100)
+})
+
+test('score: labels describe the bands without overclaiming', () => {
+  assert.match(scoreLabel(96), /near-identical/u)
+  assert.match(scoreLabel(88), /close/u)
+  assert.match(scoreLabel(72), /recognisable/u)
+  assert.match(scoreLabel(55), /same idea/u)
+  assert.match(scoreLabel(20), /different page/u)
+  assert.match(scoreLabel(null), /not scored/u)
+})
+
+test('render: browser detection never throws and caches its answer', async () => {
+  resetRendererCache()
+  const run = async () => ({ code: 1, stdout: '', stderr: '' })
+  assert.equal(await detectRenderer(run), null)
+  assert.equal(await detectRenderer(run), null, 'the second call reuses the cached miss')
 })
 
 // ── engine ─────────────────────────────────────────────────────────────────
@@ -253,6 +328,28 @@ test('engine: start, settle, snapshot and adopt a lane end to end', async () => 
     // Adopting twice is idempotent, not a second copy.
     const again = await engine.pick({ cloneId: clone.id, laneNumber: 1 })
     assert.equal(again.path, picked.path)
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+    await rm(images, { recursive: true, force: true })
+  }
+})
+
+test('engine: auto viewport follows the reference image size', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
+  const images = await mkdtemp(join(tmpdir(), 'dsh-clone-img-'))
+  const imagePath = join(images, 'mock.png')
+  await writeFile(imagePath, referencePng)
+  try {
+    const { deps } = fakeDeps(workspace, {
+      imagePath,
+      laneBuilder: async (cwd) => { await writeFile(join(cwd, 'index.html'), 'ok') },
+    })
+    const engine = new CloneEngine(deps)
+    const auto = await engine.start({ agent: { id: 's1' }, sessionId: 's1', lanes: 1, note: '', viewport: 'auto' })
+    assert.equal(auto.viewport, '900x620', 'the reference is 900x620, so the lanes build and render at that size')
+
+    const forced = await engine.start({ agent: { id: 's1' }, sessionId: 's1', lanes: 1, note: '', viewport: '1440x900' })
+    assert.equal(forced.viewport, '1440x900', 'an explicit viewport wins')
   } finally {
     await rm(workspace, { recursive: true, force: true })
     await rm(images, { recursive: true, force: true })

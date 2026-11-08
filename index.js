@@ -17,10 +17,12 @@
  * a pure state machine and test/smoke.mjs can drive it without a Harness.
  */
 
-import { basename, extname, resolve as resolvePath } from 'node:path'
+import { basename, dirname, extname, resolve as resolvePath } from 'node:path'
 import { cp, copyFile, mkdir, readFile, readdir, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { CloneEngine } from './lib/engine.js'
 import { parseCloneArgs, referenceHintOf } from './lib/parse.js'
+import { detectRenderer, renderPage } from './lib/render.js'
+import { scoreRender } from './lib/score.js'
 import { clampLanes, mediaTypeOf, reasonOf, truncate } from './lib/util.js'
 import {
   parsePreviewPath,
@@ -40,9 +42,12 @@ export const inject = ['commands', 'tools', 'workingDirectory', 'subagents', 'ag
 /** Tunables, read defensively so a partial or missing row config still works. */
 export function resolveConfig(raw) {
   const input = raw !== null && typeof raw === 'object' ? raw : {}
-  const viewport = typeof input.viewport === 'string' && /^\d{2,5}x\d{2,5}$/u.test(input.viewport)
+  // `auto` (the default) means "use the reference image's own pixel size", which
+  // is what makes the similarity score a fair comparison. An explicit
+  // `1280x800`-style value overrides it.
+  const viewport = typeof input.viewport === 'string' && input.viewport.length > 0
     ? input.viewport
-    : '1280x800'
+    : 'auto'
   return {
     lanes: clampLanes(input.lanes ?? 3, { min: 1, max: 4, fallback: 3 }),
     maxLanes: clampLanes(input.maxLanes ?? 4, { min: 1, max: 4, fallback: 4 }),
@@ -170,6 +175,28 @@ export async function apply(ctx, rawConfig) {
     }
   }
 
+  /**
+   * Render one delivered lane and score it against the reference screenshot.
+   * Every step is optional: no installed browser, a render that never lands, or
+   * bytes the decoder refuses leave the lane unscored instead of failing it.
+   */
+  const scoreLane = async ({ laneDir, referencePath, outPath, viewport }) => {
+    const browser = await detectRenderer(runCommand)
+    if (browser === null) return null
+    await mkdir(dirname(outPath), { recursive: true })
+    const rendered = await renderPage({
+      run: runCommand,
+      renderer: browser,
+      filePath: `${laneDir}/index.html`,
+      outPath,
+      viewport,
+    })
+    if (rendered === null) return null
+    const [referencePng, renderPng] = await Promise.all([readFile(referencePath), readFile(rendered)])
+    const { score } = scoreRender({ referencePng, renderPng })
+    return { score, outPath: rendered }
+  }
+
   const engine = new CloneEngine({
     now: () => Date.now(),
     id: () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}${Math.random()}`),
@@ -184,6 +211,7 @@ export async function apply(ctx, rawConfig) {
     },
     getAgent: (childId) => ctx.agents.get(childId),
     resolveReference,
+    scoreLane,
     workingDirectory: ctx.workingDirectory,
     logger: { warn: (message) => log('warn', message) },
     config,
@@ -203,10 +231,14 @@ export async function apply(ctx, rawConfig) {
       const badge = lane.status === 'settled' ? 'ready' : lane.status
       const size = lane.files.length === 0 ? 'no files' : `${lane.files.length} files`
       const suggested = lane.index === clone.winner ? ' · suggested' : ''
-      lines.push(`  lane ${lane.index + 1} (${lane.strategy.label}): ${badge} · ${lane.tools} tools · ${size}${suggested}${lane.error === null ? '' : ` · ${lane.error}`}`)
+      const score = typeof lane.score === 'number' ? ` · ${lane.score}% match` : ''
+      lines.push(`  lane ${lane.index + 1} (${lane.strategy.label}): ${badge} · ${lane.tools} tools · ${size}${score}${suggested}${lane.error === null ? '' : ` · ${lane.error}`}`)
     }
     if (clone.picked !== null) lines.push(`Adopted into: ${clone.picked.path}`)
-    else if (clone.status === 'finished') lines.push(`Adopt one with: /clone pick <lane>`)
+    else if (clone.status === 'finished') lines.push('Adopt one with: /clone pick <lane>')
+    if (clone.status === 'finished' && clone.lanes.every((lane) => typeof lane.score !== 'number')) {
+      lines.push('No browser was found for scoring, so lanes are ranked by completeness and finish time.')
+    }
     return lines.join('\n')
   }
 
@@ -424,6 +456,22 @@ export async function apply(ctx, rawConfig) {
         },
       })
 
+      const render = scope.webServer.register({
+        kind: 'exact',
+        path: '/api/dsh-clone/render',
+        handler: async (request, response) => {
+          if (reject(request, response)) return
+          const url = new URL(request.url ?? '/', 'http://127.0.0.1')
+          const clone = engine.get(url.searchParams.get('cloneId') ?? '')
+          const lane = clone?.lanes?.[Number(url.searchParams.get('lane')) - 1]
+          if (clone === undefined || lane === undefined || typeof lane.renderPath !== 'string') {
+            sendText(response, 404, 'not found')
+            return
+          }
+          await serveImageFile({ fs: { readFile }, path: lane.renderPath, mediaType: 'image/png', response })
+        },
+      })
+
       const preview = scope.webServer.register({
         kind: 'prefix',
         path: '/api/dsh-clone/preview/',
@@ -492,7 +540,7 @@ export async function apply(ctx, rawConfig) {
       })
 
       return () => {
-        for (const dispose of [state, reference, preview, action]) {
+        for (const dispose of [state, reference, render, preview, action]) {
           try {
             dispose()
           } catch {

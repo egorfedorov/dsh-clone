@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Welcome back · Mission Control</title>
+  <meta name="description" content="Sign in to continue to Mission Control.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="page">
+    <section class="brand" aria-label="Mission Control">
+      <div class="brand__card">
+        <div class="brand__inner">
+          <div class="brand__orb" aria-hidden="true">
+            <span class="brand__ring brand__ring--outer"></span>
+            <span class="brand__ring brand__ring--middle"></span>
+            <span class="brand__ring brand__ring--core"></span>
+          </div>
+          <div class="brand__lines" aria-hidden="true">
+            <span class="brand__line brand__line--long"></span>
+            <span class="brand__line brand__line--medium"></span>
+            <span class="brand__line brand__line--short"></span>
+          </div>
+          <div class="brand__pill" aria-hidden="true"></div>
+        </div>
+      </div>
+      <div class="brand__dots" aria-hidden="true">
+        <span class="brand__dot brand__dot--active"></span>
+        <span class="brand__dot"></span>
+        <span class="brand__dot"></span>
+      </div>
+    </section>
+
+    <section class="auth" aria-labelledby="auth-title">
+      <header class="auth__head">
+        <h1 class="auth__title" id="auth-title">Welcome back</h1>
+        <p class="auth__subtitle">Sign in to continue to Mission Control</p>
+      </header>
+
+      <form class="form" id="signin-form" novalidate>
+        <div class="field">
+          <label class="field__label" for="email">Email</label>
+          <input
+            class="field__input"
+            id="email"
+            name="email"
+            type="email"
+            placeholder="you@company.com"
+            autocomplete="email"
+            spellcheck="false"
+          >
+        </div>
+
+        <div class="field">
+          <label class="field__label" for="password">Password</label>
+          <input
+            class="field__input"
+            id="password"
+            name="password"
+            type="password"
+            value="mission2026"
+            autocomplete="current-password"
+          >
+        </div>
+
+        <div class="form__row">
+          <label class="remember">
+            <input class="remember__input" id="remember" name="remember" type="checkbox" checked>
+            <span class="remember__box" aria-hidden="true"></span>
+            <span class="remember__text">Remember me</span>
+          </label>
+          <a class="forgot" href="#">Forgot password?</a>
+        </div>
+
+        <button class="btn btn--primary" type="submit">Sign in</button>
+
+        <div class="divider" role="separator" aria-label="or">
+          <span class="divider__label">or</span>
+        </div>
+
+        <button class="btn btn--google" type="button">
+          <span>Continue with Google</span>
+        </button>
+      </form>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
