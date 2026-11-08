@@ -1,0 +1,64 @@
+{
+  "name": "dsh-clone",
+  "version": "0.1.0",
+  "description": "Screenshot in, working UI out: several agents rebuild the same reference interface in parallel, and you pick the live result you like best.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Egor Fedorov",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/egorfedorov/dsh-clone.git"
+  },
+  "homepage": "https://github.com/egorfedorov/dsh-clone",
+  "bugs": {
+    "url": "https://github.com/egorfedorov/dsh-clone/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "screenshot-to-code",
+    "ui-clone",
+    "design-to-code",
+    "subagents",
+    "worktree"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "lib/*.js",
+    "locale/*.json",
+    "icon.svg",
+    "cordis.patch.yml",
+    "README.md",
+    "ACCEPTABLE-USE.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node test/smoke.mjs",
+    "check": "node --check index.js && node --check client.js && for f in lib/*.js; do node --check \"$f\" || exit 1; done"
+  }
+}

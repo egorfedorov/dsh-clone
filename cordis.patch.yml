@@ -1,0 +1,9 @@
+# dsh-clone bundle patch.
+#
+# One row: the Host half owns the clone engine (reference image, isolated lane
+# directories, parallel subagents, static preview routes). The `dsh.client`
+# declaration in package.json makes the Web app load ./client.js as the
+# browser half, which draws the live side-by-side clone panel.
+- insert:
+    - id: dsh-clone
+      name: dsh-clone
