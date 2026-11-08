@@ -47,7 +47,8 @@
     "LICENSE",
     "index.json",
     "screenshots.json",
-    "docs/assets/icon-180.png"
+    "docs/assets/icon-180.png",
+    "CHANGELOG.md"
   ],
   "dsh": {
     "bundle": {

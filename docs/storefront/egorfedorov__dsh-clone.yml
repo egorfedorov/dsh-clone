@@ -7,4 +7,4 @@ description:
   en: Rebuilds a reference screenshot as working UI by running agents in parallel git worktrees, rendering each result and scoring it against the reference.
   zh: 把参考截图重建为可运行的界面：多个智能体在各自 git worktree 中并行构建，每个结果都会被渲染并与参考图比对打分。
 icon: https://raw.githubusercontent.com/egorfedorov/dsh-clone/main/docs/assets/icon-180.png
-# tarball: https://github.com/egorfedorov/dsh-clone/releases/latest/download/dsh-clone.tgz
+tarball: https://github.com/egorfedorov/dsh-clone/releases/latest/download/dsh-clone.tgz
