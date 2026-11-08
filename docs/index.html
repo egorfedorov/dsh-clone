@@ -4,132 +4,548 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>dsh-clone — screenshot in, working UI out</title>
-<meta name="description" content="A DeepSeek Harness plugin: several agents rebuild the same reference screenshot in parallel, and you adopt the live page that looks right.">
+<meta name="description" content="A DeepSeek Harness plugin: several agents rebuild the same reference screenshot in parallel git worktrees. Every result is rendered and scored against the reference, and you adopt the page that looks right.">
+<meta name="theme-color" content="#0a0e16">
+<meta property="og:type" content="website">
 <meta property="og:title" content="dsh-clone — screenshot in, working UI out">
-<meta property="og:description" content="Several agents rebuild the same reference screenshot in parallel. You adopt the live page that looks right.">
-<meta property="og:image" content="assets/hero.png">
+<meta property="og:description" content="Three agents rebuild the same interface in parallel. Every result is rendered and scored. You adopt the one that looks right — it is already a working page.">
+<meta property="og:image" content="https://egorfedorov.github.io/dsh-clone/assets/hero.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/icon-180.png">
 <style>
   :root {
     color-scheme: dark;
-    --bg: #0a0e16;
-    --panel: #16202f;
-    --border: #2a3a52;
+    --bg: #080b12;
+    --bg-2: #0b1019;
+    --panel: rgba(23, 33, 50, .72);
+    --panel-solid: #16202f;
+    --border: rgba(120, 150, 200, .16);
+    --border-strong: rgba(120, 150, 200, .28);
     --brand: #5b7cff;
-    --brand-light: #8fb0ff;
-    --label: #f3f7ff;
-    --label2: #8b9bb4;
-    --label3: #6e809a;
-    --ok: #22c55e;
-    --font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+    --brand-2: #8fb0ff;
+    --label: #f2f6ff;
+    --label-2: #a7b6cc;
+    --label-3: #6f8098;
+    --ok: #35d07f;
+    --warn: #f5a623;
+    --font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --r: 16px;
+    --max: 1120px;
   }
   * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
   body {
     margin: 0;
-    background:
-      radial-gradient(1000px 520px at 78% -10%, rgba(91,124,255,.22), transparent 60%),
-      linear-gradient(180deg, #0a0e16, #0f1726 55%, #0a0e16);
+    background: var(--bg);
     color: var(--label);
     font-family: var(--font);
+    font-size: 16px;
+    line-height: 1.55;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
   }
-  .wrap { max-width: 1040px; margin: 0 auto; padding: 40px 24px 72px; }
-  .hero { width: 100%; border-radius: 18px; display: block; box-shadow: 0 30px 80px -40px rgba(0,0,0,.9); }
-  h1 { font-size: clamp(30px, 5vw, 48px); letter-spacing: -.03em; margin: 44px 0 12px; line-height: 1.05; }
-  h1 span { color: var(--brand-light); }
-  .lede { color: var(--label2); font-size: 17px; line-height: 1.55; max-width: 62ch; margin: 0 0 28px; }
-  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 40px; }
-  a.btn {
-    display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
-    padding: 12px 20px; border-radius: 12px; font-weight: 600; font-size: 14px;
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(900px 520px at 78% -8%, rgba(91,124,255,.20), transparent 62%),
+      radial-gradient(700px 420px at 8% 4%, rgba(53,208,127,.10), transparent 60%),
+      radial-gradient(900px 600px at 50% 108%, rgba(91,124,255,.10), transparent 60%);
   }
-  a.primary { background: var(--brand); color: #fff; }
-  a.primary:hover { background: #6c8aff; }
-  a.ghost { border: 1px solid var(--border); color: var(--label); background: rgba(255,255,255,.02); }
-  a.ghost:hover { border-color: #3b5273; }
+  .wrap { position: relative; z-index: 1; max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+  a { color: var(--brand-2); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
   code, pre { font-family: var(--mono); }
-  pre {
-    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-    padding: 16px 18px; overflow-x: auto; font-size: 13px; line-height: 1.55; color: #cfe0ff;
+  :focus-visible { outline: 2px solid var(--brand-2); outline-offset: 3px; border-radius: 6px; }
+
+  /* ── nav ───────────────────────────────────────────────────────────── */
+  .nav {
+    position: sticky; top: 0; z-index: 20;
+    backdrop-filter: blur(14px) saturate(1.2);
+    background: rgba(8, 11, 18, .72);
+    border-bottom: 1px solid var(--border);
   }
-  pre b { color: var(--brand-light); font-weight: 600; }
-  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin: 26px 0 8px; }
-  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
-  .card h3 { margin: 0 0 6px; font-size: 14px; }
-  .card p { margin: 0; color: var(--label2); font-size: 13px; line-height: 1.5; }
-  .shots { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; margin: 18px 0 0; }
-  .shots figure { margin: 0; }
-  .shots img { width: 100%; border-radius: 12px; border: 1px solid var(--border); display: block; }
-  .shots figcaption { color: var(--label3); font-size: 12px; margin-top: 8px; }
-  .shots figcaption b { color: var(--ok); }
-  h2 { font-size: 20px; letter-spacing: -.01em; margin: 48px 0 6px; }
-  .muted { color: var(--label3); font-size: 13px; }
-  footer { margin-top: 56px; color: var(--label3); font-size: 12.5px; border-top: 1px solid var(--border); padding-top: 18px; }
-  footer a { color: var(--label2); }
-  @media (max-width: 720px) { .shots { grid-template-columns: 1fr; } }
+  .nav-in { display: flex; align-items: center; gap: 18px; height: 58px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -.01em; color: var(--label); }
+  .brand:hover { text-decoration: none; }
+  .brand img { width: 26px; height: 26px; border-radius: 7px; display: block; }
+  .nav-links { display: flex; gap: 20px; margin-left: auto; font-size: 14px; color: var(--label-2); }
+  .nav-links a { color: inherit; }
+  .nav-links a:hover { color: var(--label); text-decoration: none; }
+  @media (max-width: 760px) { .nav-links { display: none; } }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 40px; padding: 0 18px; border-radius: 11px;
+    font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+    border: 1px solid transparent; color: var(--label); background: transparent;
+    transition: transform .15s ease, background .15s ease, border-color .15s ease;
+    white-space: nowrap;
+  }
+  .btn:hover { text-decoration: none; transform: translateY(-1px); }
+  .btn-primary { background: linear-gradient(180deg, #6b8aff, #4d6bff); box-shadow: 0 10px 26px -12px rgba(91,124,255,.9); }
+  .btn-primary:hover { background: linear-gradient(180deg, #7b96ff, #5b7cff); }
+  .btn-ghost { border-color: var(--border-strong); background: rgba(255,255,255,.03); }
+  .btn-ghost:hover { border-color: rgba(140,170,220,.5); background: rgba(255,255,255,.06); }
+  .btn-sm { height: 32px; padding: 0 12px; font-size: 12.5px; border-radius: 9px; }
+
+  /* ── hero ──────────────────────────────────────────────────────────── */
+  header.hero { padding: 64px 0 8px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    height: 26px; padding: 0 12px; border-radius: 999px;
+    border: 1px solid var(--border-strong); background: rgba(91,124,255,.10);
+    color: var(--brand-2); font-size: 12px; font-weight: 600; letter-spacing: .02em;
+  }
+  .eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 10px var(--ok); }
+  h1 {
+    font-size: clamp(38px, 6.4vw, 68px); line-height: 1.03; letter-spacing: -.035em;
+    margin: 20px 0 0; font-weight: 750;
+  }
+  h1 .grad {
+    background: linear-gradient(100deg, #9dbcff 0%, #5b7cff 48%, #35d07f 108%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .lede { margin: 20px 0 0; max-width: 60ch; font-size: clamp(16px, 1.9vw, 19px); line-height: 1.6; color: var(--label-2); }
+  .lede b { color: var(--label); font-weight: 620; }
+  .cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 26px 0 0; }
+
+  .install-line {
+    margin: 22px 0 0; display: inline-flex; align-items: center; gap: 10px;
+    padding: 8px 10px 8px 16px; border-radius: 12px;
+    border: 1px solid var(--border); background: rgba(255,255,255,.035);
+    font-family: var(--mono); font-size: 13px; color: #cfe0ff;
+  }
+  .install-line .cmd::before { content: "$ "; color: var(--label-3); }
+  .copy {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 26px; padding: 0 10px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--border-strong); background: rgba(255,255,255,.04);
+    color: var(--label-2); font: inherit; font-family: var(--font); font-size: 11.5px; font-weight: 600;
+  }
+  .copy:hover { color: var(--label); border-color: rgba(140,170,220,.5); }
+  .copy[data-copied="true"] { color: var(--ok); border-color: rgba(53,208,127,.55); }
+
+  .hero-shot {
+    margin: 44px 0 0; border-radius: 20px; overflow: hidden;
+    border: 1px solid var(--border);
+    box-shadow: 0 40px 120px -50px rgba(0,0,0,.95), 0 0 0 1px rgba(255,255,255,.02) inset;
+  }
+  .hero-shot img { display: block; width: 100%; height: auto; }
+
+  /* ── sections ──────────────────────────────────────────────────────── */
+  section { padding: 72px 0 0; }
+  .kicker {
+    font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--brand-2); margin: 0 0 10px;
+  }
+  h2 { font-size: clamp(24px, 3.4vw, 34px); line-height: 1.15; letter-spacing: -.02em; margin: 0 0 12px; font-weight: 700; }
+  .sub { margin: 0; color: var(--label-2); max-width: 64ch; }
+
+  /* ── compare slider ────────────────────────────────────────────────── */
+  .compare {
+    position: relative; margin: 28px 0 0; border-radius: var(--r); overflow: hidden;
+    border: 1px solid var(--border); background: var(--panel-solid);
+    user-select: none; touch-action: pan-y;
+  }
+  .compare img { display: block; width: 100%; height: auto; pointer-events: none; }
+  /* The overlay keeps the full width and is clipped, so both images stay aligned. */
+  .compare .after { position: absolute; inset: 0; clip-path: inset(0 calc(100% - var(--split, 50%)) 0 0); }
+  .compare .split-line { position: absolute; top: 0; bottom: 0; left: var(--split, 50%); width: 1.5px; background: rgba(255,255,255,.9); pointer-events: none; }
+  .compare .tag {
+    position: absolute; top: 12px; padding: 4px 10px; border-radius: 8px;
+    font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    background: rgba(8,11,18,.82); border: 1px solid var(--border-strong); color: var(--label-2);
+    backdrop-filter: blur(6px);
+  }
+  .compare .tag.left { left: 12px; }
+  .compare .tag.right { right: 12px; color: var(--ok); border-color: rgba(53,208,127,.4); }
+  .compare .handle {
+    position: absolute; top: 50%; left: var(--split, 50%); transform: translate(-50%, -50%);
+    pointer-events: none; z-index: 2;
+  }
+  .compare .knob {
+    position: relative;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(8,11,18,.9); border: 1px solid rgba(255,255,255,.75);
+    display: grid; place-items: center; color: #fff; font-size: 14px;
+    box-shadow: 0 8px 24px -8px rgba(0,0,0,.9);
+  }
+  .compare input[type="range"] {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    margin: 0; opacity: 0; cursor: ew-resize; -webkit-appearance: none; appearance: none;
+  }
+  .compare-cap { margin: 10px 0 0; font-size: 13px; color: var(--label-3); }
+
+  /* ── score cards ───────────────────────────────────────────────────── */
+  .scores { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin: 22px 0 0; }
+  .score-card {
+    display: flex; align-items: center; gap: 16px; padding: 18px;
+    border-radius: var(--r); border: 1px solid var(--border); background: var(--panel);
+  }
+  .ring { position: relative; width: 72px; height: 72px; flex: none; }
+  .ring svg { transform: rotate(-90deg); display: block; }
+  .ring .track { fill: none; stroke: rgba(120,150,200,.16); stroke-width: 7; }
+  .ring .bar { fill: none; stroke: url(#ringGrad); stroke-width: 7; stroke-linecap: round; stroke-dasharray: 188.5; stroke-dashoffset: 188.5; transition: stroke-dashoffset 1.2s cubic-bezier(.2,.7,.2,1); }
+  .ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .score-card p { margin: 0; font-size: 13.5px; color: var(--label-2); }
+  .score-card strong { display: block; color: var(--label); font-size: 15px; margin-bottom: 3px; }
+
+  /* ── steps ─────────────────────────────────────────────────────────── */
+  .steps { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); margin: 26px 0 0; counter-reset: step; }
+  .step { padding: 20px; border-radius: var(--r); border: 1px solid var(--border); background: var(--panel); position: relative; }
+  .step::before {
+    counter-increment: step; content: counter(step, decimal-leading-zero);
+    font-family: var(--mono); font-size: 12px; color: var(--brand-2);
+    display: block; margin-bottom: 10px;
+  }
+  .step h3 { margin: 0 0 6px; font-size: 15.5px; }
+  .step p { margin: 0; font-size: 13.5px; color: var(--label-2); }
+  .step code { font-size: 12.5px; color: #cfe0ff; }
+
+  /* ── features ──────────────────────────────────────────────────────── */
+  .features { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin: 26px 0 0; }
+  .feature { padding: 20px; border-radius: var(--r); border: 1px solid var(--border); background: var(--panel); transition: border-color .2s ease, transform .2s ease; }
+  .feature:hover { border-color: var(--border-strong); transform: translateY(-2px); }
+  .feature h3 { margin: 0 0 6px; font-size: 15.5px; display: flex; align-items: center; gap: 8px; }
+  .feature h3 .ico { width: 20px; height: 20px; border-radius: 6px; background: rgba(91,124,255,.18); display: grid; place-items: center; font-size: 11px; flex: none; }
+  .feature p { margin: 0; font-size: 13.5px; color: var(--label-2); }
+
+  /* ── honest panel ──────────────────────────────────────────────────── */
+  .honest { margin: 26px 0 0; padding: 22px; border-radius: var(--r); border: 1px solid rgba(245,166,35,.32); background: rgba(245,166,35,.06); }
+  .honest h3 { margin: 0 0 12px; font-size: 15.5px; color: #ffd08a; }
+  .honest ul { margin: 0; padding-left: 20px; color: var(--label-2); font-size: 14px; }
+  .honest li { margin: 6px 0; }
+  .honest b { color: var(--label); }
+
+  /* ── install ───────────────────────────────────────────────────────── */
+  .install-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); margin: 26px 0 0; }
+  .way { padding: 20px; border-radius: var(--r); border: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; gap: 10px; }
+  .way h3 { margin: 0; font-size: 15px; }
+  .way p { margin: 0; font-size: 13px; color: var(--label-2); }
+  .way pre {
+    margin: 0; padding: 12px 14px; border-radius: 10px; overflow-x: auto;
+    background: rgba(0,0,0,.35); border: 1px solid var(--border);
+    font-size: 12.5px; color: #cfe0ff; white-space: pre-wrap; word-break: break-all;
+  }
+  .way .row { display: flex; gap: 8px; align-items: center; }
+
+  /* ── faq ───────────────────────────────────────────────────────────── */
+  .faq { margin: 26px 0 0; display: grid; gap: 10px; }
+  details.qa { border: 1px solid var(--border); border-radius: 12px; background: var(--panel); padding: 0 18px; }
+  details.qa[open] { border-color: var(--border-strong); }
+  details.qa summary { cursor: pointer; padding: 15px 0; font-weight: 600; font-size: 14.5px; list-style: none; display: flex; justify-content: space-between; gap: 14px; }
+  details.qa summary::-webkit-details-marker { display: none; }
+  details.qa summary::after { content: "+"; color: var(--label-3); font-weight: 400; }
+  details.qa[open] summary::after { content: "–"; }
+  details.qa div { padding: 0 0 16px; color: var(--label-2); font-size: 14px; }
+
+  /* ── ru block ──────────────────────────────────────────────────────── */
+  .ru { margin: 30px 0 0; padding: 22px; border-radius: var(--r); border: 1px dashed var(--border-strong); background: rgba(255,255,255,.02); }
+  .ru h3 { margin: 0 0 8px; font-size: 15px; }
+  .ru p { margin: 0; color: var(--label-2); font-size: 14px; }
+
+  footer { margin: 72px 0 0; padding: 26px 0 44px; border-top: 1px solid var(--border); color: var(--label-3); font-size: 13px; }
+  footer .row { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+  footer a { color: var(--label-2); }
+
+  /* ── reveal ────────────────────────────────────────────────────────── */
+  .reveal { opacity: 0; transform: translateY(14px); transition: opacity .6s ease, transform .6s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+    .ring .bar { transition: none; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <a href="https://github.com/egorfedorov/dsh-clone"><img class="hero" src="assets/hero.png" alt="dsh-clone — screenshot in, working UI out"></a>
-
-  <h1>Screenshot in. <span>Working UI out.</span></h1>
-  <p class="lede">
-    A DeepSeek Harness plugin. Paste a screenshot of any interface, run <code>/clone 3</code>, and three agents
-    rebuild it in parallel — each in its own isolated directory. A live panel shows the reference beside every
-    attempt, each one rendered and scored. You adopt the page that looks right, and it is already a working page.
-  </p>
-
-  <div class="row">
-    <a class="btn primary" href="demo/">Open the live clone →</a>
-    <a class="btn ghost" href="https://github.com/egorfedorov/dsh-clone">GitHub</a>
-    <a class="btn ghost" href="https://github.com/egorfedorov/dsh-clone#install">Install</a>
+<nav class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top"><img src="assets/icon-180.png" alt=""><span>dsh-clone</span></a>
+    <div class="nav-links">
+      <a href="#demo">Demo</a>
+      <a href="#how">How it works</a>
+      <a href="#install">Install</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <a class="btn btn-ghost btn-sm" href="https://github.com/egorfedorov/dsh-clone" style="margin-left:auto">GitHub</a>
+    <a class="btn btn-primary btn-sm" href="#install">Get the plugin</a>
   </div>
+</nav>
 
-  <pre>you:  [paste a screenshot]  <b>/clone 3</b>
-me:   ▸ 3 agents · 3 isolated directories · same reference
-      ▸ reference | lane 1 | lane 2 | lane 3   (live, rendered, scored)
-you:  [Adopt this one]
-me:   ▸ ./clone-a91c-lane-2/index.html  ← open it, it runs</pre>
+<div class="wrap" id="top">
+  <header class="hero">
+    <span class="eyebrow"><span class="dot"></span> DeepSeek Harness plugin</span>
+    <h1>Screenshot in.<br><span class="grad">Working UI out.</span></h1>
+    <p class="lede">
+      Paste a screenshot of any interface. Run <code>/clone 3</code>. Three agents rebuild it in parallel —
+      each in its own isolated git worktree. Every result is <b>rendered and scored</b> against the reference,
+      and you adopt the page that looks right. It is already a working page: plain HTML, CSS and vanilla JS.
+    </p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="demo/">Open a real clone →</a>
+      <a class="btn btn-ghost" href="#how">See how it works</a>
+      <a class="btn btn-ghost" href="https://github.com/egorfedorov/dsh-clone">Source</a>
+    </div>
+    <div class="install-line">
+      <span class="cmd">dsh plugin add dsh-clone</span>
+      <button class="copy" data-copy="dsh plugin add dsh-clone" aria-label="Copy install command">Copy</button>
+    </div>
+    <div class="hero-shot reveal">
+      <img src="assets/hero.png" alt="dsh-clone: a reference frame fanned out to three parallel lanes, one of them adopted into the workspace" width="1280" height="420">
+    </div>
+  </header>
 
-  <h2>One real run, not a mock</h2>
-  <p class="muted">Reference on the left, the adopted lane on the right. The score is the plugin's own: a coarse-grid picture comparison of the rendered page against the reference.</p>
-  <div class="shots">
-    <figure>
-      <img src="assets/reference.png" alt="reference sign-in screen">
-      <figcaption>Reference — what the person pasted</figcaption>
-    </figure>
-    <figure>
-      <img src="demo/preview.png" alt="the adopted clone, rendered">
-      <figcaption>Clone, rendered — <b>92.7% match</b> · <a href="demo/">open it live</a></figcaption>
-    </figure>
-  </div>
+  <section id="demo">
+    <p class="kicker">A real run, not a mock</p>
+    <h2>Drag the handle. That is the clone the plugin built.</h2>
+    <p class="sub">
+      Left: the screenshot a person pasted. Right: the page the plugin delivered and the plugin's own headless
+      render of it. No retries, no edits — one command, one adopted lane.
+    </p>
+    <div class="compare reveal" id="compare">
+      <img src="assets/card-clone.png" alt="The clone the plugin built, rendered">
+      <div class="after"><img src="assets/card-reference.png" alt="The reference screenshot the clone was built from"></div>
+      <span class="tag left">Reference</span>
+      <span class="tag right">Clone · 99.8%</span>
+      <div class="handle"><span class="knob">↔</span></div>
+      <div class="split-line"></div>
+      <input type="range" min="0" max="100" value="50" aria-label="Compare the reference and the clone">
+    </div>
+    <p class="compare-cap">A billing card, 520×360, built in one lane: one file, no assets, no JS. The bigger run — a sign-in screen with a photo-free illustration — landed at 92.7% and is <a href="demo/">open in the browser</a> too.</p>
 
-  <h2>A second run, a different shape</h2>
-  <p class="muted">A small billing card where the builder's own layout spec paid off — one file, no assets, no JS.</p>
-  <div class="shots">
-    <figure>
-      <img src="assets/card-reference.png" alt="reference billing card">
-      <figcaption>Reference — 520×360</figcaption>
-    </figure>
-    <figure>
-      <img src="assets/card-clone.png" alt="the billing card clone, rendered">
-      <figcaption>Clone, rendered — <b>99.8% match</b> · <a href="demo/card.html">open it live</a></figcaption>
-    </figure>
-  </div>
+    <div class="scores">
+      <div class="score-card reveal">
+        <div class="ring" data-score="92.7">
+          <svg width="72" height="72" viewBox="0 0 72 72"><defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8fb0ff"/><stop offset="1" stop-color="#35d07f"/></linearGradient></defs><circle class="track" cx="36" cy="36" r="30"/><circle class="bar" cx="36" cy="36" r="30"/></svg>
+          <b>92.7%</b>
+        </div>
+        <p><strong>Sign-in screen</strong>900×620 reference · one adopted lane · rendered at the reference's own size</p>
+      </div>
+      <div class="score-card reveal">
+        <div class="ring" data-score="99.8">
+          <svg width="72" height="72" viewBox="0 0 72 72"><circle class="track" cx="36" cy="36" r="30"/><circle class="bar" cx="36" cy="36" r="30"/></svg>
+          <b>99.8%</b>
+        </div>
+        <p><strong>Billing card</strong>520×360 reference · the lane's own layout spec paid off · one file, no assets</p>
+      </div>
+      <div class="score-card reveal">
+        <div style="width:72px;height:72px;flex:none;display:grid;place-items:center;border-radius:50%;border:1px dashed var(--border-strong);color:var(--label-3);font-size:11px;text-align:center;line-height:1.2">you<br>choose</div>
+        <p><strong>Score suggests, you decide</strong>The percentage ranks attempts. It never certifies a page — that is your call.</p>
+      </div>
+    </div>
+  </section>
 
-  <h2>What it does that one attempt cannot</h2>
-  <div class="grid">
-    <div class="card"><h3>Three angles</h3><p>Measure first, structure first, visual first — the same reference, three working methods.</p></div>
-    <div class="card"><h3>Isolated lanes</h3><p>In a repository every lane is a real git worktree on its own branch. Your checkout is never touched.</p></div>
-    <div class="card"><h3>Rendered and scored</h3><p>Each delivered lane is screenshotted headlessly and compared with the reference. The best score is suggested; you decide.</p></div>
-    <div class="card"><h3>Adopted, not exported</h3><p>One click copies the winning lane into your workspace as plain HTML/CSS/JS. No build step, no server.</p></div>
+  <section id="how">
+    <p class="kicker">How it works</p>
+    <h2>Four ways to fail, compared in the time of one</h2>
+    <p class="sub">One attempt is a lottery: you cannot tell whether the model misunderstood you or simply chose a different solution, because you only ever see one.</p>
+    <div class="steps">
+      <div class="step reveal">
+        <h3>Give it a picture</h3>
+        <p>Paste a screenshot into the conversation, then <code>/clone 3</code>. Or point at a file: <code>/clone 2 ./mock.png</code>. The last image is the spec.</p>
+      </div>
+      <div class="step reveal">
+        <h3>Three builders, three angles</h3>
+        <p>Measure first · structure first · visual first · component first. Inside a repository each lane is a real <code>git worktree</code> on its own branch — nothing leaks between attempts.</p>
+      </div>
+      <div class="step reveal">
+        <h3>Render and score</h3>
+        <p>Each delivered page is screenshotted by an installed Chromium browser, decoded, and compared with the reference on a coarse colour grid.</p>
+      </div>
+      <div class="step reveal">
+        <h3>Adopt, don't export</h3>
+        <p>One click copies the chosen lane into your workspace as <code>clone-ab12-lane-2/</code> — no <code>.git</code>, no dependencies, no scratch files. Open it and it runs.</p>
+      </div>
+    </div>
+
+    <div class="features">
+      <div class="feature reveal"><h3><span class="ico">⚑</span> The finish line is a real render</h3><p>Not a self-report. The plugin drives headless Chrome itself, then compares pixels on a 48×32 colour grid.</p></div>
+      <div class="feature reveal"><h3><span class="ico">⌘</span> Your checkout is never touched</h3><p>Lanes live in worktrees and in <code>.dsh-clone/</code>. No commit, no checkout, no reset on your branch — a test asserts exactly that.</p></div>
+      <div class="feature reveal"><h3><span class="ico">◱</span> Live, side by side</h3><p>The Clone tab shows the reference beside every lane's actual page in an iframe, with strategy, timing, tools and tokens.</p></div>
+      <div class="feature reveal"><h3><span class="ico">⧉</span> Dependencies shared, not reinstalled</h3><p><code>node_modules</code>, <code>.venv</code> and <code>vendor</code> are symlinked into each lane. Three lanes do not mean three installs.</p></div>
+      <div class="feature reveal"><h3><span class="ico">⏱</span> Budgets, not patience</h3><p>Every builder gets an effort budget and a wall-clock limit. A lane that keeps polishing is stopped and its finished page is still delivered and scored.</p></div>
+      <div class="feature reveal"><h3><span class="ico">⛨</span> Sandboxed by default</h3><p>Model-written pages are served under a <code>sandbox</code> CSP and mounted with <code>sandbox="allow-scripts"</code>: they cannot reach your cookies, storage or the Harness API.</p></div>
+    </div>
+  </section>
+
+  <section id="honest">
+    <p class="kicker">Trust</p>
+    <h2>It tells you what it cannot do</h2>
+    <div class="honest reveal">
+      <h3>Honest limits, kept in the README and on purpose</h3>
+      <ul>
+        <li><b>The score measures the picture, not the truth.</b> 99% agreement can still hide wrong copy or broken behaviour. It ranks attempts; it does not certify one.</li>
+        <li><b>The score is coarse by design.</b> Two lanes a few points apart are usually a coin flip — open both before adopting.</li>
+        <li><b>Cost is N×.</b> Three builders cost roughly three builds. <code>lanes: 2</code> is a reasonable everyday setting.</li>
+        <li><b>Vision is required.</b> A text-only model produces a guess, not a clone.</li>
+        <li><b>Images are approximated</b> with CSS and SVG — the right silhouette and palette, not the original pixels.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="install">
+    <p class="kicker">Install</p>
+    <h2>Three ways in, one plugin</h2>
+    <p class="sub">Requires a DeepSeek Harness profile with <code>subagents</code> (the <code>dsh-base</code> bundle ships the <code>spawn</code> backend) and Node 20+. Scoring uses an installed Chromium-family browser when present.</p>
+    <div class="install-grid">
+      <div class="way reveal">
+        <h3>1 · By package name</h3>
+        <p>Settings → Plugins → Add plugin, then type the package name.</p>
+        <pre>dsh-clone</pre>
+        <div class="row"><button class="copy" data-copy="dsh-clone">Copy name</button></div>
+      </div>
+      <div class="way reveal">
+        <h3>2 · From this index</h3>
+        <p>Turn on <b>Custom plugin indexes</b>, add this URL, then install from the Discover tab.</p>
+        <pre>https://raw.githubusercontent.com/egorfedorov/dsh-clone/main/index.json</pre>
+        <div class="row"><button class="copy" data-copy="https://raw.githubusercontent.com/egorfedorov/dsh-clone/main/index.json">Copy index URL</button></div>
+      </div>
+      <div class="way reveal">
+        <h3>3 · From source</h3>
+        <p>Clone the repository and install the bundle from its directory.</p>
+        <pre>git clone https://github.com/egorfedorov/dsh-clone</pre>
+        <div class="row"><button class="copy" data-copy="git clone https://github.com/egorfedorov/dsh-clone">Copy</button></div>
+      </div>
+    </div>
+    <p class="compare-cap">Or take the release tarball: <a href="https://github.com/egorfedorov/dsh-clone/releases/latest/download/dsh-clone.tgz">dsh-clone.tgz</a>. Updating: the market reports <code>update-available</code>; an upgrade is a reinstall, and your work lives in the workspace, so nothing is lost.</p>
+  </section>
+
+  <section id="faq">
+    <p class="kicker">Questions</p>
+    <h2>What people ask before trying it</h2>
+    <div class="faq">
+      <details class="qa"><summary>Is this a screenshot-to-code toy or something I can keep?</summary><div>The output is a static page — index.html plus the CSS, JS and assets it loads. No build step, no framework, no server. That is deliberate: the result always runs when you open it, and it is a real starting point for a hand-written component.</div></details>
+      <details class="qa"><summary>Does it touch my working tree or my branches?</summary><div>No. Inside a repository each lane is a separate <code>git worktree</code> on its own branch under <code>dsh-clone/</code>; adopted output is copied into a new folder. A test builds a throwaway repository and asserts that your dirty file, your branch and your HEAD are untouched.</div></details>
+      <details class="qa"><summary>What if no browser is installed?</summary><div>You lose the percentage and nothing else. Lanes are still isolated, previewed live in the panel, and ranked by completeness and finish time. Scoring is an optional amplifier, not a dependency.</div></details>
+      <details class="qa"><summary>Can it clone any product's UI?</summary><div>Technically yes, and that is exactly why there is an <a href="https://github.com/egorfedorov/dsh-clone/blob/main/ACCEPTABLE-USE.md">acceptable-use page</a>. Rebuilding your own designs, prototypes and internal tools is the intended use. Cloning a competitor's product to ship as your own, or building look-alikes of banking and identity screens, is not.</div></details>
+      <details class="qa"><summary>How much does one clone cost?</summary><div>Roughly N builds for N lanes. Start with two, raise the count when the task is genuinely ambiguous. The builders carry a token budget and a wall-clock limit so a lane cannot run away.</div></details>
+    </div>
+  </section>
+
+  <div class="ru reveal">
+    <h3>По-русски</h3>
+    <p>Плагин для DeepSeek Harness: скидываешь скриншот интерфейса, пишешь <code>/clone 3</code> — три агента параллельно собирают его в изолированных git worktree. Каждая готовая страница рендерится в headless-браузере и сравнивается с эталоном; лучший процент предлагается, но выбираешь ты. Выбранная версия копируется в рабочую папку как готовая статическая страница.</p>
   </div>
 
   <footer>
-    MIT · <a href="https://github.com/egorfedorov/dsh-clone">github.com/egorfedorov/dsh-clone</a><br>
-    The demo page was built by the plugin from <code>assets/reference.png</code>. Use it on interfaces you have the right to rebuild.
+    <div class="row">
+      <span>MIT · Egor Fedorov</span>
+      <a href="https://github.com/egorfedorov/dsh-clone">GitHub</a>
+      <a href="https://github.com/egorfedorov/dsh-clone#readme">README</a>
+      <a href="https://github.com/egorfedorov/dsh-clone/blob/main/ACCEPTABLE-USE.md">Acceptable use</a>
+      <a href="https://github.com/egorfedorov/dsh-clone/blob/main/docs/PUBLISHING.md">Distribution</a>
+      <span style="margin-left:auto">The demo pages on this site were built by the plugin itself.</span>
+    </div>
   </footer>
 </div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── copy buttons ───────────────────────────────────────────────────────
+  var copies = document.querySelectorAll('.copy[data-copy]');
+  Array.prototype.forEach.call(copies, function (button) {
+    button.addEventListener('click', function () {
+      var text = button.getAttribute('data-copy');
+      var done = function () {
+        var label = button.textContent;
+        button.textContent = 'Copied';
+        button.setAttribute('data-copied', 'true');
+        setTimeout(function () {
+          button.textContent = label;
+          button.removeAttribute('data-copied');
+        }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () {});
+        return;
+      }
+      var area = document.createElement('textarea');
+      area.value = text;
+      area.setAttribute('readonly', '');
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      document.body.removeChild(area);
+    });
+  });
+
+  // ── reveal on scroll ───────────────────────────────────────────────────
+  var reveals = document.querySelectorAll('.reveal');
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduced || !('IntersectionObserver' in window)) {
+    Array.prototype.forEach.call(reveals, function (node) { node.classList.add('in'); });
+  } else {
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { rootMargin: '0px 0px -12% 0px', threshold: 0.12 });
+    Array.prototype.forEach.call(reveals, function (node) { observer.observe(node); });
+  }
+
+  // ── score rings ────────────────────────────────────────────────────────
+  var rings = document.querySelectorAll('.ring[data-score]');
+  var CIRCUMFERENCE = 2 * Math.PI * 30;
+  var fillRing = function (ring) {
+    var score = parseFloat(ring.getAttribute('data-score')) || 0;
+    var bar = ring.querySelector('.bar');
+    if (!bar) return;
+    var offset = CIRCUMFERENCE * (1 - Math.min(1, Math.max(0, score / 100)));
+    bar.style.strokeDashoffset = String(offset);
+  };
+  if (reduced || !('IntersectionObserver' in window)) {
+    Array.prototype.forEach.call(rings, fillRing);
+  } else {
+    var ringObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        fillRing(entry.target);
+        ringObserver.unobserve(entry.target);
+      });
+    }, { threshold: 0.4 });
+    Array.prototype.forEach.call(rings, function (ring) { ringObserver.observe(ring); });
+  }
+
+  // ── before/after slider ────────────────────────────────────────────────
+  var compare = document.getElementById('compare');
+  if (compare) {
+    var range = compare.querySelector('input[type="range"]');
+    var setSplit = function (value) {
+      var split = Math.min(100, Math.max(0, Number(value)));
+      compare.style.setProperty('--split', split + '%');
+    };
+    setSplit(range ? range.value : 50);
+    if (range) range.addEventListener('input', function () { setSplit(range.value); });
+    compare.addEventListener('pointerdown', function (event) {
+      if (!range) return;
+      var rect = compare.getBoundingClientRect();
+      var move = function (moveEvent) {
+        setSplit(((moveEvent.clientX - rect.left) / rect.width) * 100);
+      };
+      move(event);
+      var up = function () {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    });
+  }
+})();
+</script>
 </body>
 </html>
