@@ -64,7 +64,7 @@ A real run, not a mock: one command, one lane adopted, no retries.
 | | |
 |---|---|
 | **Reference** — what the person pasted | <img src="docs/assets/reference.png" alt="reference sign-in screen" width="420"> |
-| **The clone** — rendered by the plugin from the adopted lane | <img src="demo/preview.png" alt="the adopted clone, rendered" width="420"> |
+| **The clone** — rendered by the plugin from the adopted lane | <img src="docs/demo/preview.png" alt="the adopted clone, rendered" width="420"> |
 | **Result** | **92.7% picture match** · plain HTML + CSS + JS · [open it live](https://egorfedorov.github.io/dsh-clone/demo/) |
 
 The score is the plugin's own: the rendered page and the reference are averaged into a coarse colour grid and compared. It measures *how much of the picture agrees*, not whether the page is correct — see [Honest limits](#honest-limits).
