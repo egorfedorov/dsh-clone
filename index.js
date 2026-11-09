@@ -22,8 +22,11 @@ import { cp, copyFile, mkdir, readFile, readdir, realpath, rm, stat, symlink, wr
 import { CloneEngine } from './lib/engine.js'
 import { parseCloneArgs, referenceHintOf } from './lib/parse.js'
 import { makeScoreLane } from './lib/score-lane.js'
+import { pathToFileURL } from 'node:url'
+import { join } from 'node:path'
 import { runAcceptance } from './lib/accept.js'
 import { buildDiff } from './lib/diff.js'
+import { inspectPage } from './lib/render.js'
 import { clampLanes, mediaTypeOf, reasonOf, truncate } from './lib/util.js'
 import {
   parsePreviewPath,
@@ -75,6 +78,11 @@ export function resolveConfig(raw) {
     // Let the local leaderboard reorder which strategies run. Off keeps the
     // configured order, which is useful for a controlled comparison.
     autoStrategies: input.autoStrategies !== false,
+    // Run the delivered page and reject lanes whose console throws or whose
+    // content spills past the viewport. `strictDynamic: false` records them as
+    // warnings instead.
+    dynamicChecks: input.dynamicChecks !== false,
+    strictDynamic: input.strictDynamic !== false,
     commandName: typeof input.commandName === 'string' && input.commandName.length > 0 ? input.commandName : 'clone',
     tool: input.tool !== false,
     command: input.command !== false,
@@ -215,10 +223,31 @@ export async function apply(ctx, rawConfig) {
   /** Static acceptance checklist over one delivered lane. */
   const acceptLane = async ({ dir, files }) => runAcceptance({ fs: { readFile }, dir, files })
 
-  /** Diff heatmap for one rendered lane, written beside the clone. */
-  const diffLane = async ({ referencePath, renderPath, outPath }) => {
+  /** Re-score an existing render against the reference, optionally on a region. */
+  const rescoreLane = async ({ referencePath, renderPath, region }) => {
     const [referencePng, renderPng] = await Promise.all([readFile(referencePath), readFile(renderPath)])
-    const result = buildDiff({ referencePng, renderPng })
+    const { score } = scoreRender({ referencePng, renderPng, region: region ?? null })
+    return { score }
+  }
+
+  /** Run the delivered page and read back its runtime report. */
+  const inspectLane = async ({ dir, viewport, scratch }) => {
+    const renderer = await detectRenderer(runCommand)
+    if (renderer === null) return null
+    return inspectPage({
+      run: runCommand,
+      renderer,
+      filePath: join(dir, 'index.html'),
+      scratchDir: scratch,
+      viewport,
+      baseHref: pathToFileURL(`${dir}/`).href,
+    })
+  }
+
+  /** Diff heatmap for one rendered lane, written beside the clone. */
+  const diffLane = async ({ referencePath, renderPath, outPath, region }) => {
+    const [referencePng, renderPng] = await Promise.all([readFile(referencePath), readFile(renderPath)])
+    const result = buildDiff({ referencePng, renderPng, region: region ?? null })
     await mkdir(dirname(outPath), { recursive: true })
     await writeFile(outPath, result.png)
     return { outPath, regions: result.regions, worst: result.worst, mean: result.mean }
@@ -239,6 +268,8 @@ export async function apply(ctx, rawConfig) {
     getAgent: (childId) => ctx.agents.get(childId),
     resolveReference,
     scoreLane,
+    rescoreLane,
+    inspectLane,
     acceptLane,
     buildDiff: diffLane,
     nudgeLane,
@@ -274,7 +305,13 @@ export async function apply(ctx, rawConfig) {
       const worst = lane.worstRegion === undefined || lane.worstRegion === null
         ? ''
         : ` · worst ${lane.worstRegion.name} (${lane.worstRegion.difference})`
-      lines.push(`  lane ${lane.index + 1} (${lane.strategy.label}): ${badge} · ${lane.tools} tools · ${size}${score}${gate}${worst}${suggested}${lane.error === null ? '' : ` · ${lane.error}`}`)
+      const runtime = lane.runtime === undefined || lane.runtime === null
+        ? ''
+        : ` · ${lane.runtime.errors.length + lane.runtime.rejections.length + lane.runtime.consoleErrors.length} runtime error(s) · overflow ${lane.runtime.overflowX}px`
+      lines.push(`  lane ${lane.index + 1} (${lane.strategy.label}): ${badge} · ${lane.tools} tools · ${size}${score}${gate}${worst}${runtime}${suggested}${lane.error === null ? '' : ` · ${lane.error}`}`)
+    }
+    if (clone.region !== null && clone.region !== undefined) {
+      lines.push(`Scoring region: x=${clone.region.x} y=${clone.region.y} w=${clone.region.width} h=${clone.region.height} (only this rectangle is compared)`)
     }
     if (clone.strategyReason !== null && clone.strategyReason !== undefined) lines.push(`Lanes: ${clone.strategyReason}`)
     const board = clone.workspace === undefined ? null : engine.boards.get(clone.workspace)
@@ -327,7 +364,7 @@ export async function apply(ctx, rawConfig) {
     return cloneId === undefined ? engine.latestForSession(agent.id) : engine.get(cloneId)
   }
 
-  const perform = async ({ action, cloneId, lane, agent, sessionId, lanes, note }) => {
+  const perform = async ({ action, cloneId, lane, agent, sessionId, lanes, note, mode, into, region }) => {
     switch (action) {
       case 'start': {
         const text = await startClone({ agent, sessionId, lanes, note })
@@ -363,13 +400,42 @@ export async function apply(ctx, rawConfig) {
         }
       }
       case 'pick': {
-        const target = cloneId === undefined ? latestClone(sessionId) : engine.get(cloneId)
+        const target = cloneId === undefined ? await findClone(undefined, agent) : await findClone(cloneId, agent)
         if (target === null || target === undefined) throw new Error('dsh-clone: no clone to adopt')
+        if (mode === 'diff') {
+          const adopted = await engine.adoptAsPatch({
+            cloneId: target.id,
+            laneNumber: lane ?? null,
+            into: into ?? null,
+          })
+          const lines = [
+            `Lane adopted as a patch into ${adopted.target}.`,
+            adopted.conflicts.length === 0
+              ? 'No existing file overlapped, so the lane was written through unchanged.'
+              : `${adopted.conflicts.length} existing file(s) overlapped: ${adopted.conflicts.join(', ')}.`,
+            `Patch: ${adopted.patchPath}`,
+            adopted.applied ? 'The patch applied cleanly to the repository.' : 'The patch was written but not applied — review it, then run git apply.',
+          ]
+          return { text: lines.join(' '), clone: target }
+        }
         const picked = await engine.pick({ cloneId: target.id, laneNumber: lane ?? null })
         return {
           text: `Lane ${picked.lane.index + 1} adopted into ${picked.path}. Open index.html to see it; the other lanes stay in .dsh-clone/ until you /clone discard.`,
           clone: target,
         }
+      }
+      case 'region': {
+        const target = cloneId === undefined ? await findClone(undefined, agent) : await findClone(cloneId, agent)
+        if (target === null || target === undefined) throw new Error('dsh-clone: no clone to score')
+        const area = region === null || region === undefined ? null : region
+        const updated = await engine.setRegion({ cloneId: target.id, region: area })
+        const winner = updated.lanes.find((candidate) => candidate.index === updated.winner)
+        const lines = area === null
+          ? ['Region cleared: lanes are scored against the whole page again.']
+          : [`Scoring region set to x=${area.x} y=${area.y} w=${area.width} h=${area.height} — every lane re-scored from the render it already has.`]
+        lines.push(...updated.lanes.map((lane) => `lane ${lane.index + 1}: ${lane.status}${typeof lane.score === 'number' ? ` · ${lane.score}%` : ''}`))
+        if (winner !== undefined && winner !== null) lines.push(`Suggested: lane ${winner.index + 1}.`)
+        return { text: lines.join('\n'), clone: updated }
       }
       case 'cancel': {
         const target = cloneId === undefined ? latestClone(sessionId) : engine.get(cloneId)
@@ -406,6 +472,8 @@ export async function apply(ctx, rawConfig) {
                 '/clone status — lane states of the latest clone',
                 '/clone pick <lane> — copy that lane into the workspace as a working app',
                 '/clone refine [lane] [change] — rebuild the adopted page with one change, scored against the same reference',
+                '/clone region clear — score the whole page again (set a region by dragging on the reference in the Clone tab)',
+                '/clone pick <lane> --diff [dir] — adopt as a patch instead of a folder, for a component library',
                 '/clone cancel — stop the builders',
                 '/clone discard — delete the scratch directories',
               ].join('\n'),
@@ -415,9 +483,10 @@ export async function apply(ctx, rawConfig) {
             return { kind: 'success', text: renderStatus(latestClone(invocation.agent.id)) }
           }
           const result = await perform({
-            action: parsed.kind,
+            action: parsed.kind === 'region' ? 'region' : parsed.kind,
             lane: parsed.lane ?? null,
             note: parsed.note ?? '',
+            region: parsed.kind === 'region' ? null : undefined,
             agent: invocation.agent,
             sessionId: invocation.agent.id,
           })
@@ -437,7 +506,7 @@ export async function apply(ctx, rawConfig) {
       description: [
         'Rebuild a user interface from a reference screenshot, in parallel, and adopt the result the user prefers.',
         'Use `start` when the user shows a screenshot and wants it as working code: it launches N builder agents, each in its own isolated directory (a git worktree inside a repository), all rebuilding the same reference image.',
-        'The operations mirror the /clone command: start, status, pick, refine, cancel, discard. `pick` copies one finished lane into the workspace as a working static page; `refine` rebuilds an adopted page with one requested change and scores it against the same reference, so the improvement is measurable.',
+        'The operations mirror the /clone command: start, status, pick, region, refine, cancel, discard. `pick` copies one finished lane into the workspace as a working static page, or with mode "diff" adopts it as a patch into an existing directory for a component library. `region` re-scores every lane on one rectangle of the reference — the same attempts, judged on the part that matters. `refine` rebuilds an adopted page with one requested change and reports the score delta.',
       ].join(' '),
       parameters: {
         type: 'object',
@@ -446,7 +515,7 @@ export async function apply(ctx, rawConfig) {
         properties: {
           action: {
             type: 'string',
-            enum: ['start', 'status', 'pick', 'refine', 'cancel', 'discard'],
+            enum: ['start', 'status', 'pick', 'region', 'refine', 'cancel', 'discard'],
             description: 'start a clone, read its state, adopt one lane, stop the builders, or delete the scratch directories.',
           },
           lanes: {
@@ -465,6 +534,26 @@ export async function apply(ctx, rawConfig) {
             type: 'string',
             description: 'Target an older clone instead of the latest one for this session.',
           },
+          region: {
+            type: 'object',
+            description: 'For `region`: score only this part of the screen. Fractions of the image, 0..1; omit or pass null to clear.',
+            additionalProperties: false,
+            properties: {
+              x: { type: 'number' },
+              y: { type: 'number' },
+              width: { type: 'number' },
+              height: { type: 'number' },
+            },
+          },
+          mode: {
+            type: 'string',
+            enum: ['copy', 'diff'],
+            description: 'For `pick`: copy the lane into a new folder (default), or adopt it as a patch into an existing directory.',
+          },
+          into: {
+            type: 'string',
+            description: 'For `pick` with mode "diff": the target directory, relative to the workspace or absolute.',
+          },
         },
       },
       output: {
@@ -482,6 +571,9 @@ export async function apply(ctx, rawConfig) {
           sessionId: agent.id,
           lanes: args.lanes ?? config.lanes,
           note: args.note ?? '',
+          mode: args.mode,
+          into: args.into,
+          region: args.region ?? null,
         })
         return result.text
       },
@@ -630,8 +722,25 @@ export async function apply(ctx, rawConfig) {
             switch (body.action) {
               case 'pick': {
                 const laneNumber = Number.isInteger(body.lane) ? body.lane : null
+                if (body.mode === 'diff') {
+                  const adopted = await engine.adoptAsPatch({
+                    cloneId: clone.id,
+                    laneNumber,
+                    into: typeof body.into === 'string' ? body.into : null,
+                  })
+                  sendJson(response, 200, { ok: true, ...adopted, clone: engine.snapshot(clone) })
+                  return
+                }
                 const picked = await engine.pick({ cloneId: clone.id, laneNumber })
                 sendJson(response, 200, { ok: true, path: picked.path, lane: picked.lane.index, clone: engine.snapshot(clone) })
+                return
+              }
+              case 'region': {
+                const updated = await engine.setRegion({
+                  cloneId: clone.id,
+                  region: body.region === undefined ? null : body.region,
+                })
+                sendJson(response, 200, { ok: true, clone: engine.snapshot(updated) })
                 return
               }
               case 'cancel':

@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.4.0 — 2026-11-09
+
+The gate and the score get sharper, and adoption learns the component-library case.
+
+**Region scoring**
+
+- drag a rectangle on the reference and every lane is re-scored on that part only;
+  the renders already exist, so it is instant and rebuilds nothing. The background
+  of a screenshot is often most of the picture, and a page can score well on it
+  while the card you asked for is wrong.
+
+**Runtime checks**
+
+- the delivered page is opened with a harness injected as its first script and the
+  answer is read back from the rendered DOM — no DevTools socket, no session;
+- it reports uncaught exceptions, unhandled rejections, `console.error` calls and
+  how far the content spills past the viewport;
+- uncaught errors and horizontal overflow reject the lane; `strictDynamic: false`
+  demotes them to recorded warnings, `dynamicChecks: false` skips the run.
+
+**Adoption as a patch**
+
+- `pick … --diff [dir]` adopts into an existing directory: new files are written
+  through, overlapping files become a unified diff in
+  `.dsh-clone/<id>/patch/lane-<n>.patch`, and the patch is applied with
+  `git apply` in a repository.
+
 ## 0.3.0 — 2026-11-09
 
 A score alone invites the right objection: *high score, but does it work?* This

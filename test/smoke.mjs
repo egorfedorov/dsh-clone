@@ -24,6 +24,8 @@ import { decodePng, readPngSize } from '../lib/png.js'
 import { GRID, colourSimilarity, combineScore, edgeGridOf, gridOf, scoreLabel, scoreRender } from '../lib/score.js'
 import { detectRenderer, resetRendererCache } from '../lib/render.js'
 import { runAcceptance } from '../lib/accept.js'
+import { dynamicChecks, injectCheckHarness, parseCheckResult } from '../lib/checks.js'
+import { cropImage, normaliseRegion } from '../lib/score.js'
 import { buildDiff, summariseRegions } from '../lib/diff.js'
 import { emptyBoard, recordRun, recommendStrategies, standing, summariseBoard, MIN_RUNS_TO_RECOMMEND } from '../lib/leaderboard.js'
 
@@ -526,6 +528,70 @@ test('leaderboard: the summary is sorted best first and bounded', () => {
   assert.equal(summary.rows[0].id, 'visual-first')
 })
 
+// ── regions ───────────────────────────────────────────────────────────────
+
+test('region: fractions are clamped and empty rectangles are refused', () => {
+  assert.deepEqual(normaliseRegion({ x: 0.1, y: 0.2, width: 0.3, height: 0.4 }), { x: 0.1, y: 0.2, width: 0.3, height: 0.4 })
+  assert.deepEqual(normaliseRegion({ x: -1, y: 0.9, width: 2, height: 2 }), { x: 0, y: 0.9, width: 1, height: 0.1 })
+  assert.equal(normaliseRegion({ x: 0.5, y: 0.5, width: 0, height: 0.5 }), null)
+  assert.equal(normaliseRegion(null), null)
+})
+
+test('region: cropping keeps the requested pixels', () => {
+  const image = decodePng(referencePng)
+  const crop = cropImage(image, { x: 0.5, y: 0.5, width: 0.5, height: 0.5 })
+  assert.deepEqual({ width: crop.width, height: crop.height }, { width: 450, height: 310 })
+  assert.equal(cropImage(image, null), image)
+})
+
+test('region: scoring one part of the screen differs from scoring all of it', () => {
+  const full = scoreRender({ referencePng, renderPng })
+  const region = scoreRender({ referencePng, renderPng, region: { x: 0.1, y: 0.2, width: 0.5, height: 0.5 } })
+  assert.equal(full.region, null)
+  assert.deepEqual(region.region, { x: 0.1, y: 0.2, width: 0.5, height: 0.5 })
+  assert.equal(typeof region.score, 'number')
+  assert.ok(region.score <= 100 && region.score >= 0)
+})
+
+test('region: the diff follows the region', () => {
+  const full = buildDiff({ referencePng, renderPng })
+  const region = buildDiff({ referencePng, renderPng, region: { x: 0.5, y: 0.5, width: 0.4, height: 0.4 } })
+  assert.equal(full.region, null)
+  assert.deepEqual(region.region, { x: 0.5, y: 0.5, width: 0.4, height: 0.4 })
+  assert.equal(decodePng(region.png).width, 48 * 12)
+})
+
+// ── runtime checks ────────────────────────────────────────────────────────
+
+test('runtime: the harness is injected before any page script', () => {
+  const page = '<!doctype html><html lang="en"><head><title>T</title><script>window.pageScript=1</script></head><body></body></html>'
+  const injected = injectCheckHarness(page)
+  assert.ok(injected.indexOf('data-dsh-check') < injected.indexOf('window.pageScript'))
+  assert.equal(injectCheckHarness('<html><body>x</body></html>').includes('data-dsh-check'), true)
+})
+
+test('runtime: a report with errors and overflow fails both checks', () => {
+  const payload = encodeURIComponent(JSON.stringify({
+    done: true, errors: ['boom @ app.js'], rejections: [], consoleErrors: ['hydration mismatch'], overflowX: 34, scrollWidth: 554, clientWidth: 520,
+  }))
+  const parsed = parseCheckResult(`<html data-dsh-check="${payload}"></html>`)
+  assert.equal(parsed.done, true)
+  const checks = dynamicChecks(parsed)
+  assert.equal(checks.find((check) => check.id === 'runtime').ok, false)
+  assert.equal(checks.find((check) => check.id === 'no-overflow').ok, false)
+})
+
+test('runtime: a clean report passes, and a missing report is not a failure', () => {
+  const payload = encodeURIComponent(JSON.stringify({
+    done: true, errors: [], rejections: [], consoleErrors: [], overflowX: 0, scrollWidth: 520, clientWidth: 520,
+  }))
+  const clean = dynamicChecks(parseCheckResult(`<html data-dsh-check="${payload}"></html>`))
+  assert.equal(clean.every((check) => check.ok), true)
+  const missing = dynamicChecks(parseCheckResult('<html></html>'))
+  assert.equal(missing.every((check) => check.ok), true)
+  assert.match(missing[0].detail, /unavailable/u)
+})
+
 // ── engine ─────────────────────────────────────────────────────────────────
 
 const realFs = { cp, copyFile, mkdir, readFile, readdir, rm, stat, symlink, writeFile }
@@ -772,6 +838,136 @@ test('engine: a finished clone records the leaderboard, and the next clone reads
     const summary = engine.snapshot(next).leaderboard
     assert.ok(summary.runs >= MIN_RUNS_TO_RECOMMEND * 2)
     assert.equal(summary.rows.length >= 1, true)
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+    await rm(images, { recursive: true, force: true })
+  }
+})
+
+test('engine: changing the region re-scores the lanes it already has', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
+  const images = await mkdtemp(join(tmpdir(), 'dsh-clone-img-'))
+  const imagePath = join(images, 'mock.png')
+  await writeFile(imagePath, 'png-bytes')
+
+  try {
+    const calls = []
+    const { deps } = fakeDeps(workspace, {
+      imagePath,
+      laneBuilder: async (cwd) => { await writeFile(join(cwd, 'index.html'), 'ok') },
+    })
+    let sequence = 0
+    deps.id = () => `z${String((sequence += 1)).padStart(7, '0')}`
+    deps.scoreLane = async ({ outPath, region }) => {
+      calls.push({ kind: 'score', region: region ?? null })
+      return { score: 80, outPath: `${outPath}.png` }
+    }
+    deps.rescoreLane = async ({ region }) => {
+      calls.push({ kind: 'rescore', region: region ?? null })
+      return { score: region === null ? 80 : 94 }
+    }
+    deps.acceptLane = async () => ({ pass: true, checks: [{ id: 'page', ok: true, detail: 'ok' }] })
+
+    const engine = new CloneEngine(deps)
+    const clone = await engine.start({ agent: { id: 's1' }, sessionId: 's1', lanes: 2, note: '', viewport: 'auto' })
+    await waitFor(() => clone.status === 'finished')
+    assert.equal(clone.region, null)
+    assert.equal(calls.filter((call) => call.kind === 'score').length, 2)
+
+    const region = { x: 0.2, y: 0.2, width: 0.4, height: 0.4 }
+    const updated = await engine.setRegion({ cloneId: clone.id, region })
+    assert.deepEqual(updated.region, region)
+    assert.equal(calls.filter((call) => call.kind === 'rescore').length, 2, 'both lanes were re-scored, not rebuilt')
+    assert.equal(updated.lanes.every((lane) => lane.score === 94), true)
+    assert.equal(engine.snapshot(updated).region.x, 0.2)
+
+    await engine.setRegion({ cloneId: clone.id, region: null })
+    assert.equal(updated.region, null)
+    assert.equal(updated.lanes[0].score, 80)
+    await assert.rejects(() => engine.setRegion({ cloneId: clone.id, region: { x: 0.5, y: 0.5, width: 0, height: 0 } }), /non-empty rectangle/u)
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+    await rm(images, { recursive: true, force: true })
+  }
+})
+
+test('engine: a runtime failure rejects the lane unless strictDynamic is off', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
+  const images = await mkdtemp(join(tmpdir(), 'dsh-clone-img-'))
+  const imagePath = join(images, 'mock.png')
+  await writeFile(imagePath, 'png-bytes')
+
+  const page = '<!doctype html><html lang="en"><head><title>T</title></head><body><h1>Hi</h1><p>Enough copy to pass the static page check here.</p></body></html>'
+  const build = async (strict) => {
+    const { deps } = fakeDeps(workspace, {
+      imagePath,
+      laneBuilder: async (cwd) => { await writeFile(join(cwd, 'index.html'), page) },
+    })
+    let sequence = 0
+    deps.id = () => `d${String((sequence += 1)).padStart(7, '0')}`
+    deps.config = { viewport: '520x360', strictDynamic: strict }
+    deps.scoreLane = async ({ outPath }) => ({ score: 88, outPath: `${outPath}.png` })
+    deps.acceptLane = async ({ dir, files }) => runAcceptance({ fs: realFs, dir, files })
+    deps.inspectLane = async () => ({ done: true, errors: [], rejections: [], consoleErrors: ['hydration mismatch'], overflowX: 40, scrollWidth: 560, clientWidth: 520 })
+    const engine = new CloneEngine(deps)
+    const clone = await engine.start({ agent: { id: 's1' }, sessionId: 's1', lanes: 1, note: '', viewport: 'auto' })
+    await waitFor(() => clone.status === 'finished')
+    return clone.lanes[0]
+  }
+
+  try {
+    const strict = await build(true)
+    assert.equal(strict.status, 'rejected')
+    assert.equal(strict.gate.pass, false)
+    assert.match(strict.gate.checks.map((check) => `${check.id}:${check.ok}`).join(' '), /runtime:false/u)
+    assert.match(strict.gate.checks.map((check) => `${check.id}:${check.ok}`).join(' '), /no-overflow:false/u)
+    assert.equal(strict.runtime.overflowX, 40)
+
+    const relaxed = await build(false)
+    assert.equal(relaxed.status, 'settled', 'with strictDynamic off the lane stays adoptable')
+    assert.equal(relaxed.gate.pass, true)
+    assert.equal(relaxed.dynamicWarning, true)
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+    await rm(images, { recursive: true, force: true })
+  }
+})
+
+test('engine: adopt as a patch writes new files and diffs the overlapping ones', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
+  const images = await mkdtemp(join(tmpdir(), 'dsh-clone-img-'))
+  const imagePath = join(images, 'mock.png')
+  await writeFile(imagePath, 'png-bytes')
+  const target = join(workspace, 'components', 'card')
+  await mkdir(target, { recursive: true })
+  await writeFile(join(target, 'index.html'), '<!doctype html>old version')
+
+  try {
+    const { deps } = fakeDeps(workspace, {
+      imagePath,
+      laneBuilder: async (cwd) => {
+        await writeFile(join(cwd, 'index.html'), '<!doctype html>new version with more copy')
+        await writeFile(join(cwd, 'styles.css'), 'body{margin:0}')
+      },
+    })
+    let sequence = 0
+    deps.id = () => `p${String((sequence += 1)).padStart(7, '0')}`
+    deps.scoreLane = async ({ outPath }) => ({ score: 90, outPath: `${outPath}.png` })
+    deps.acceptLane = async () => ({ pass: true, checks: [{ id: 'page', ok: true, detail: 'ok' }] })
+
+    const engine = new CloneEngine(deps)
+    const clone = await engine.start({ agent: { id: 's1' }, sessionId: 's1', lanes: 1, note: '', viewport: 'auto' })
+    await waitFor(() => clone.status === 'finished')
+
+    const adopted = await engine.adoptAsPatch({ cloneId: clone.id, laneNumber: 1, into: 'components/card' })
+    assert.equal(adopted.target, target)
+    assert.deepEqual(adopted.conflicts, ['index.html'], 'the overlapping file becomes a diff')
+    assert.equal(await readFile(join(target, 'styles.css'), 'utf8'), 'body{margin:0}', 'a new file is written through')
+    assert.equal(await readFile(join(target, 'index.html'), 'utf8'), '<!doctype html>old version', 'the existing file is left for review')
+    const patch = await readFile(adopted.patchPath, 'utf8')
+    assert.match(patch, /--- a\/index\.html/u)
+    assert.match(patch, /\+<!doctype html>new version with more copy/u)
+    assert.equal(adopted.applied, false, 'a plain directory is not a repository, so nothing is applied')
   } finally {
     await rm(workspace, { recursive: true, force: true })
     await rm(images, { recursive: true, force: true })

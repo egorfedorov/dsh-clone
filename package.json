@@ -1,6 +1,6 @@
 {
   "name": "dsh-clone",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Screenshot in, working UI out: several agents rebuild the same reference interface in parallel, and you pick the live result you like best.",
   "type": "module",
   "license": "MIT",

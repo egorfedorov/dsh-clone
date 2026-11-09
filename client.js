@@ -78,6 +78,10 @@ window.__ModuleLoader__.load({
       'panel.diff': 'diff ↗',
       'panel.worst': 'worst',
       'panel.board': 'here',
+      'panel.region': 'region',
+      'panel.regionHint': 'Drag on the reference to score only that part',
+      'panel.regionClear': 'Whole page',
+      'panel.runtime': 'runtime',
       'panel.emptyLane': 'no page',
       'panel.failed': 'failed',
       'panel.cancelled': 'cancelled',
@@ -300,6 +304,87 @@ window.__ModuleLoader__.load({
       'coarse-grid colour comparison of the rendered page, not a correctness check',
       'views: live page (above) · rendered snapshot',
     ].join('\n')
+
+    /**
+     * Drag-to-select on the reference image.
+     *
+     * The rectangle is stored as fractions, so it describes the same area of the
+     * reference and of every render whatever their pixel size. Selecting one
+     * re-scores the lanes the clone already has — no rebuild.
+     */
+    function RegionLayer({ props, clone, busy, onPickRegion }) {
+      const imageRef = useRef(null)
+      const [drag, setDrag] = useState(null)
+      const region = clone.region ?? null
+
+      const fractionOf = (event, rect) => ({
+        x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
+        y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
+      })
+
+      const rectangleOf = (start, current) => {
+        const x = Math.min(start.x, current.x)
+        const y = Math.min(start.y, current.y)
+        const width = Math.abs(current.x - start.x)
+        const height = Math.abs(current.y - start.y)
+        if (width < 0.02 || height < 0.02) return null
+        return {
+          x: Math.round(x * 1000) / 1000,
+          y: Math.round(y * 1000) / 1000,
+          width: Math.round(width * 1000) / 1000,
+          height: Math.round(height * 1000) / 1000,
+        }
+      }
+
+      const startDrag = (event) => {
+        if (imageRef.current === null || busy) return
+        const rect = imageRef.current.getBoundingClientRect()
+        const start = fractionOf(event, rect)
+        setDrag({ start, current: start })
+        const move = (moveEvent) => setDrag({ start, current: fractionOf(moveEvent, rect) })
+        const up = (upEvent) => {
+          window.removeEventListener('pointermove', move)
+          window.removeEventListener('pointerup', up)
+          setDrag(null)
+          const picked = rectangleOf(start, fractionOf(upEvent, rect))
+          if (picked !== null) onPickRegion(picked)
+        }
+        window.addEventListener('pointermove', move)
+        window.addEventListener('pointerup', up)
+      }
+
+      const preview = drag === null ? null : rectangleOf(drag.start, drag.current)
+      const shown = preview ?? region
+      const styleOf = (box) => ({
+        position: 'absolute',
+        left: `${box.x * 100}%`,
+        top: `${box.y * 100}%`,
+        width: `${box.width * 100}%`,
+        height: `${box.height * 100}%`,
+        border: `1.5px solid ${T.brand}`,
+        background: 'rgba(91,124,255,0.16)',
+        borderRadius: 3,
+        pointerEvents: 'none',
+      })
+
+      return h('div', {
+        ref: imageRef,
+        onPointerDown: startDrag,
+        style: {
+          position: 'relative', cursor: 'crosshair', touchAction: 'none',
+          border: `0.5px solid ${T.borderL2}`, borderRadius: 8, overflow: 'hidden', background: T.layer2,
+        },
+      }, [
+        h('img', {
+          key: 'img',
+          src: clone.reference.url,
+          alt: clone.reference.label,
+          draggable: false,
+          style: { display: 'block', width: '100%', height: 'auto', userSelect: 'none' },
+        }),
+        shown === null ? null : h('div', { key: 'box', style: styleOf(shown) }),
+      ])
+    }
 
     // ── lane card ───────────────────────────────────────────────────────────
 
@@ -614,17 +699,32 @@ window.__ModuleLoader__.load({
             style: { fontFamily: MONO, fontSize: 10, textTransform: 'none', letterSpacing: 0, fontWeight: 400 },
           }, `${clone.viewport} · ${formatMs(clone.durationMs)}`),
         ]),
-        h('div', {
+        h(RegionLayer, {
           key: 'image',
+          props,
+          clone,
+          busy,
+          onPickRegion: (region) => act({ cloneId: clone.id, action: 'region', region }, 'Re-scored on the selected region.'),
+        }),
+        h('div', {
+          key: 'regionline',
           style: {
-            border: `0.5px solid ${T.borderL2}`, borderRadius: 8, overflow: 'hidden',
-            background: T.layer2, minHeight: 0,
+            display: 'flex', alignItems: 'center', gap: 6,
+            fontFamily: FONT, fontSize: 10.5, color: T.label3,
           },
-        }, h('img', {
-          src: clone.reference.url,
-          alt: clone.reference.label,
-          style: { display: 'block', width: '100%', height: 'auto' },
-        })),
+        }, [
+          h('span', { key: 'label' }, clone.region === null || clone.region === undefined
+            ? translate(props, 'panel.regionHint')
+            : `${translate(props, 'panel.region')} ${Math.round(clone.region.width * 100)}% × ${Math.round(clone.region.height * 100)}%`),
+          h('span', { key: 'spacer', style: { flex: '1 1 auto' } }),
+          clone.region === null || clone.region === undefined
+            ? null
+            : h(Button, {
+              key: 'clear',
+              disabled: busy,
+              onClick: () => act({ cloneId: clone.id, action: 'region', region: null }, 'Scoring the whole page again.'),
+            }, translate(props, 'panel.regionClear')),
+        ]),
         clone.picked === null ? null : h('div', {
           key: 'adopted',
           style: { fontFamily: MONO, fontSize: 10.5, color: T.label2, wordBreak: 'break-all' },
