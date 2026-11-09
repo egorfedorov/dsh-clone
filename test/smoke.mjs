@@ -674,6 +674,15 @@ test('engine: refine edits the adopted page and reports the score delta', async 
     assert.equal(snapshot.kind, 'refine')
     assert.equal(snapshot.delta, 10)
     assert.equal(snapshot.sourceScore, 80)
+
+    // The refine story must survive a restart, not just live memory.
+    const revived = new CloneEngine(deps)
+    await revived.restore(workspace)
+    const restoredRefine = revived.get(refined.id)
+    assert.equal(restoredRefine.kind, 'refine')
+    assert.equal(restoredRefine.sourceId, base.id)
+    assert.equal(restoredRefine.sourceScore, 80)
+    assert.equal(restoredRefine.delta, 10)
   } finally {
     await rm(workspace, { recursive: true, force: true })
     await rm(images, { recursive: true, force: true })
