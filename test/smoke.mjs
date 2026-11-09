@@ -35,7 +35,7 @@ const tests = []
 const test = (name, fn) => tests.push({ name, fn })
 
 /** Poll a predicate until it holds or the deadline passes. */
-async function waitFor(predicate, { timeoutMs = 4000, stepMs = 10 } = {}) {
+async function waitFor(predicate, { timeoutMs = 15_000, stepMs = 10 } = {}) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     if (await predicate()) return

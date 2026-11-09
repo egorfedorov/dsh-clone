@@ -26,7 +26,7 @@ import { pathToFileURL } from 'node:url'
 import { join } from 'node:path'
 import { runAcceptance } from './lib/accept.js'
 import { buildDiff } from './lib/diff.js'
-import { inspectPage } from './lib/render.js'
+import { inspectPage, lastInspectDiagnostic } from './lib/render.js'
 import { clampLanes, mediaTypeOf, reasonOf, truncate } from './lib/util.js'
 import {
   parsePreviewPath,
@@ -232,16 +232,29 @@ export async function apply(ctx, rawConfig) {
 
   /** Run the delivered page and read back its runtime report. */
   const inspectLane = async ({ dir, viewport, scratch }) => {
-    const renderer = await detectRenderer(runCommand)
-    if (renderer === null) return null
-    return inspectPage({
-      run: runCommand,
-      renderer,
-      filePath: join(dir, 'index.html'),
-      scratchDir: scratch,
-      viewport,
-      baseHref: pathToFileURL(`${dir}/`).href,
-    })
+    const diagnosticPath = join(dirname(scratch), 'diagnostic.json')
+    let report = null
+    try {
+      const renderer = await detectRenderer(runCommand)
+      report = renderer === null ? null : await inspectPage({
+        run: runCommand,
+        renderer,
+        filePath: join(dir, 'index.html'),
+        scratchDir: scratch,
+        viewport,
+        baseHref: pathToFileURL(`${dir}/`).href,
+      })
+    } catch (error) {
+      // An exception here is a defect, not a verdict: keep it for the reporter.
+      lastInspectDiagnostic = { stage: 'throw', detail: reasonOf(error) }
+    }
+    if (report === null) {
+      // Keep the reason next to the clone: "the harness never reported" is only
+      // actionable together with the stage, exit code and stderr tail.
+      await mkdir(dirname(diagnosticPath), { recursive: true }).catch(() => {})
+      await writeFile(diagnosticPath, JSON.stringify({ ...lastInspectDiagnostic, dir, viewport }, null, 2)).catch(() => {})
+    }
+    return report
   }
 
   /** Diff heatmap for one rendered lane, written beside the clone. */
