@@ -4,8 +4,11 @@ The launch post asks authors to fill in an expression-of-interest form:
 <https://trtgsjkv6r.feishu.cn/share/base/form/shrcnkRrxNyri4bOF9n48BIYWbb>
 
 Only the account owner can submit it (it asks for your identity and contact).
-This file holds copy that is ready to paste, in English and Chinese, so the form
-takes minutes instead of an hour.
+
+**Field-by-field answers, matched to the live form, live in
+[form-answers.md](form-answers.md) — use that file.** This one holds the longer
+prose version of the same material, for the description and the “anything else”
+boxes.
 
 **Your details**
 
