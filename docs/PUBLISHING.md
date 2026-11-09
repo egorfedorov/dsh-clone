@@ -156,8 +156,8 @@ filename literally — a versioned name would 404 on the next release.
 | Step | State |
 |---|---|
 | npm account | signed in as `egorfedorov` |
-| `npm publish` | `0.2.0` and `0.3.0` are on the registry; **`0.4.0` is published as a GitHub release and not yet on npm** |
-| Market index | live and valid, pinned to the `0.4.0` commit (`git+https://…#<sha>`), so installs get the current features without waiting for npm; switch the version's `source` back to `{"type":"npm"}` after publishing 0.4.0 |
+| `npm publish` | **done** — `0.2.0`, `0.3.0` and `0.4.0` are live; `latest` is `0.4.0`, repository linked, both dsh manifests declared |
+| Market index | live and valid, pointing at the npm source: installs resolve to `dsh-clone@0.4.0`, and storefronts can show the download count |
 | awesome-dsh-plugin PR | **[#13425](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13425)** open — CI's repo-age gate needs the repository to be 1 day old (2026-11-09 16:05 UTC); the verdict re-runs itself |
 | Official program form | **submitted 2026-11-09** by the author, using the field-by-field copy in [storefront/form-answers.md](storefront/form-answers.md) (EN + 中文); support asked for: token grant, technical Q&A, promotion, user feedback |
 | Storefront screenshot of the panel itself | still missing — the four declared images are real plugin outputs, not the panel. Needs a browser session |

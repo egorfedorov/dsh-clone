@@ -59,11 +59,9 @@
       "versions": [
         {
           "version": "0.4.0",
-          "publishTimestamp": 1794192970,
+          "publishTimestamp": 1794193705,
           "source": {
-            "type": "git",
-            "url": "https://github.com/egorfedorov/dsh-clone",
-            "commit": "bcc874de9485cc060c94463f3a9e5230bddae3f7"
+            "type": "npm"
           },
           "engines": {
             "dsh": ">=0.2.0-rc.2 || >=0.2.1-rc.2 || >=0.2.2-rc.1"
