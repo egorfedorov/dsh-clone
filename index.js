@@ -252,8 +252,15 @@ export async function apply(ctx, rawConfig) {
         const text = await startClone({ agent, sessionId, lanes, note })
         return { text, clone: latestClone(sessionId) }
       }
-      case 'status':
-        return { text: renderStatus(latestClone(sessionId)), clone: latestClone(sessionId) }
+      case 'status': {
+        // `clone_id` addresses an older clone, which the panel cannot reach once
+        // a newer one exists; without it the newest clone for this session wins.
+        const target = cloneId === undefined ? latestClone(sessionId) : engine.get(cloneId)
+        if (cloneId !== undefined && target === undefined) {
+          throw new Error(`dsh-clone: unknown clone "${cloneId}"`)
+        }
+        return { text: renderStatus(target ?? null), clone: target ?? null }
+      }
       case 'pick': {
         const target = cloneId === undefined ? latestClone(sessionId) : engine.get(cloneId)
         if (target === null || target === undefined) throw new Error('dsh-clone: no clone to adopt')

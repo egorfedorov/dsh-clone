@@ -185,6 +185,7 @@ All optional; the defaults are the intended experience.
 - **Vision is required.** The builder must actually see the reference. A text-only model produces a guess; pair dsh-clone with a vision-capable route or a vision bridge plugin.
 - **Images are approximated.** Without image generation, photos and illustrations become CSS/SVG stand-ins with the right silhouette and palette, not the original pixels.
 - **Static output.** No Next.js project, no design system — by design, so the result is always runnable in one click.
+- **Scoring needs an installed browser.** Chrome, Chromium, Edge or Brave on macOS, Windows or Linux; `DSH_CLONE_BROWSER` overrides the probe. No browser means no percentage, and nothing else changes.
 - **A careful builder is a slow builder.** Hence the effort budget and the wall-clock limit; tune those, not your patience.
 
 ## Roadmap
