@@ -543,6 +543,81 @@ test('engine: a lane over its token budget is stopped and its page kept', async 
   }
 })
 
+test('engine: a lane that only analyses is nudged to write the page', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
+  const images = await mkdtemp(join(tmpdir(), 'dsh-clone-img-'))
+  const imagePath = join(images, 'mock.png')
+  await writeFile(imagePath, 'png-bytes')
+
+  try {
+    const nudges = []
+    const { deps } = fakeDeps(workspace, {
+      imagePath,
+      laneBuilder: async () => {}, // writes nothing: the analysing lane
+    })
+    deps.config = { viewport: '900x620', nudgeAtTools: 3 }
+    deps.spawnAgent = async ({ label }) => ({
+      childId: `analyst-${label}`,
+      result: new Promise(() => {}),
+      dispose: async () => {},
+    })
+    // The live child reports 40 tool calls and no usage.
+    deps.getAgent = () => ({
+      session: {
+        snapshotEvents: () => Array.from({ length: 40 }, () => ({ type: 'tool/call', data: {} })),
+      },
+    })
+    deps.nudgeLane = async ({ text }) => { nudges.push(text) }
+
+    const engine = new CloneEngine(deps)
+    const clone = await engine.start({ agent: { id: 's1' }, sessionId: 's1', lanes: 1, note: '', viewport: 'auto' })
+    engine.tick()
+    engine.tick()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+
+    assert.equal(nudges.length, 1, 'exactly one nudge per lane')
+    assert.match(nudges[0], /write the page now/iu)
+    assert.match(nudges[0], /index\.html does not exist/u)
+    assert.equal(clone.lanes[0].nudged, true)
+    engine.tick()
+    assert.equal(nudges.length, 1, 'a lane is nudged once, not every tick')
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+    await rm(images, { recursive: true, force: true })
+  }
+})
+
+test('engine: a delivered lane is never nudged', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
+  const images = await mkdtemp(join(tmpdir(), 'dsh-clone-img-'))
+  const imagePath = join(images, 'mock.png')
+  await writeFile(imagePath, 'png-bytes')
+
+  try {
+    const nudges = []
+    const { deps } = fakeDeps(workspace, {
+      imagePath,
+      laneBuilder: async (cwd) => { await writeFile(join(cwd, 'index.html'), 'ok') },
+    })
+    deps.config = { viewport: '900x620', nudgeAtTools: 1 }
+    deps.spawnAgent = async ({ cwd, label }) => {
+      await writeFile(join(cwd, 'index.html'), 'ok')
+      return { childId: `child-${label}`, result: new Promise(() => {}), dispose: async () => {} }
+    }
+    deps.getAgent = () => ({ session: { snapshotEvents: () => [{ type: 'tool/call', data: {} }] } })
+    deps.nudgeLane = async ({ text }) => { nudges.push(text) }
+
+    const engine = new CloneEngine(deps)
+    await engine.start({ agent: { id: 's1' }, sessionId: 's1', lanes: 1, note: '', viewport: 'auto' })
+    engine.tick()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    assert.equal(nudges.length, 0)
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+    await rm(images, { recursive: true, force: true })
+  }
+})
+
 test('engine: refine edits the adopted page and reports the score delta', async () => {
   const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
   const images = await mkdtemp(join(tmpdir(), 'dsh-clone-img-'))

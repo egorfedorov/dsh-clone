@@ -153,6 +153,8 @@ The strategies differ; the contract does not. Every lane also carries an explici
 
 **Budgets.** Every builder gets an effort budget in the prompt and a wall-clock limit (`laneTimeoutMs`); whichever is hit first settles the lane with whatever it delivered. `laneTokenBudget` adds a hard token ceiling and is off by default, because an agent re-sends its context on every step — a small ceiling stops honest builds mid-analysis, so it is a deliberate opt-in backstop rather than a default.
 
+**The nudge.** Some models answer "measure first" by sampling the screenshot's pixels for their entire budget and then ending with nothing written. If a lane is past `nudgeAtTools` (12) tool calls with no `index.html` on disk, the plugin sends it one steering message: stop measuring, write the page now. One message, once per lane.
+
 ## Configuration
 
 All optional; the defaults are the intended experience.
@@ -164,6 +166,7 @@ All optional; the defaults are the intended experience.
 | `viewport` | `auto` | build and render size; `auto` uses the reference image's own pixel size |
 | `laneTimeoutMs` | `900000` | wall-clock limit per lane (15 min); the lane is stopped and its output kept |
 | `laneTokenBudget` | `0` (off) | token ceiling per lane. Off by default because an agent re-sends its context every step; 2M+ is a sensible backstop |
+| `nudgeAtTools` | `12` | tool calls after which a lane with no `index.html` is told to stop analysing and write the page; `0` disables it |
 | `provider` | `spawn` | `ctx.subagents` backend used for builders |
 | `pollMs` | `900` | live counter refresh interval |
 | `commandName` | `clone` | rename the slash command |

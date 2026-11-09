@@ -36,6 +36,14 @@ Everything in this release is about the plugin being right when it is left alone
   delivered. Off by default: an agent re-sends its context every step, so a naive
   ceiling stops honest builds mid-analysis — set it deliberately as a backstop.
 
+**A nudge instead of a wasted run**
+
+- a lane past 12 tool calls with no `index.html` on disk gets one steering
+  message telling it to stop measuring and write the page. Observed failure that
+  motivated it: a builder spent every call sampling pixels and ended with an
+  empty directory. The prompts now also forbid image-measurement scripts
+  outright.
+
 **Robustness**
 
 - a rendered screenshot must decode before it is scored; a truncated capture is

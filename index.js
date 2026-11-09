@@ -65,6 +65,11 @@ export function resolveConfig(raw) {
     laneTokenBudget: Number.isFinite(input.laneTokenBudget) && input.laneTokenBudget > 0
       ? Math.floor(input.laneTokenBudget)
       : 0,
+    // Tool calls after which a lane that still has no index.html is told to stop
+    // analysing and write the page. 0 disables the nudge.
+    nudgeAtTools: Number.isFinite(input.nudgeAtTools) && input.nudgeAtTools >= 0
+      ? Math.floor(input.nudgeAtTools)
+      : 12,
     commandName: typeof input.commandName === 'string' && input.commandName.length > 0 ? input.commandName : 'clone',
     tool: input.tool !== false,
     command: input.command !== false,
@@ -190,6 +195,18 @@ export async function apply(ctx, rawConfig) {
   // drives the same path the plugin does.
   const scoreLane = makeScoreLane(runCommand)
 
+  /**
+   * Steer a running builder: one user-authored message to the exact child.
+   * Failures are logged and ignored — a nudge is an optimisation, never a
+   * precondition for the lane to finish.
+   */
+  const nudgeLane = async ({ childId, parent, text }) => {
+    if (childId === null || parent === undefined) return
+    await ctx.subagents.sendMessage(parent, childId, [{ type: 'text', text }], {
+      signal: new AbortController().signal,
+    })
+  }
+
   const engine = new CloneEngine({
     now: () => Date.now(),
     id: () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}${Math.random()}`),
@@ -205,6 +222,7 @@ export async function apply(ctx, rawConfig) {
     getAgent: (childId) => ctx.agents.get(childId),
     resolveReference,
     scoreLane,
+    nudgeLane,
     workingDirectory: ctx.workingDirectory,
     logger: { warn: (message) => log('warn', message) },
     config,
