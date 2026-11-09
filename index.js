@@ -58,11 +58,13 @@ export function resolveConfig(raw) {
     laneTimeoutMs: Number.isFinite(input.laneTimeoutMs) && input.laneTimeoutMs >= 60_000
       ? Math.floor(input.laneTimeoutMs)
       : 15 * 60 * 1000,
-    // Token ceiling per lane, so a builder cannot run away with the month.
-    // 0 disables it; the default is generous for one static page.
-    laneTokenBudget: Number.isFinite(input.laneTokenBudget) && input.laneTokenBudget >= 0
+    // Token ceiling per lane. Off by default: an agent re-sends its context on
+    // every step, so cumulative input tokens grow fast enough that a naive
+    // default kills honest builds mid-analysis. Set it deliberately (2M+ is a
+    // sensible ceiling for one static page) when you want a hard backstop.
+    laneTokenBudget: Number.isFinite(input.laneTokenBudget) && input.laneTokenBudget > 0
       ? Math.floor(input.laneTokenBudget)
-      : 600_000,
+      : 0,
     commandName: typeof input.commandName === 'string' && input.commandName.length > 0 ? input.commandName : 'clone',
     tool: input.tool !== false,
     command: input.command !== false,

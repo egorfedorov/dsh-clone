@@ -32,8 +32,9 @@ Everything in this release is about the plugin being right when it is left alone
 
 **Budget**
 
-- `laneTokenBudget` (default 600k) stops a lane that burns past its ceiling and
-  keeps whatever it delivered, alongside the existing wall-clock limit.
+- `laneTokenBudget` stops a lane that burns past its ceiling and keeps whatever it
+  delivered. Off by default: an agent re-sends its context every step, so a naive
+  ceiling stops honest builds mid-analysis — set it deliberately as a backstop.
 
 **Robustness**
 

@@ -151,7 +151,7 @@ The strategies differ; the contract does not. Every lane also carries an explici
 
 **Durability.** Each clone writes a small `state.json` next to its work. A plugin reload or a restart does not throw the run away: `status` and `pick` rebuild it from disk, and a lane that was mid-build keeps whatever it had already written, labelled as interrupted rather than pretending it finished.
 
-**Budgets.** Every builder gets an effort budget in the prompt, a wall-clock limit (`laneTimeoutMs`) and a token ceiling (`laneTokenBudget`). Whichever is hit first settles the lane with whatever it delivered — a runaway builder costs one lane, not the month.
+**Budgets.** Every builder gets an effort budget in the prompt and a wall-clock limit (`laneTimeoutMs`); whichever is hit first settles the lane with whatever it delivered. `laneTokenBudget` adds a hard token ceiling and is off by default, because an agent re-sends its context on every step — a small ceiling stops honest builds mid-analysis, so it is a deliberate opt-in backstop rather than a default.
 
 ## Configuration
 
@@ -163,7 +163,7 @@ All optional; the defaults are the intended experience.
 | `maxLanes` | `4` | hard cap on lanes per clone |
 | `viewport` | `auto` | build and render size; `auto` uses the reference image's own pixel size |
 | `laneTimeoutMs` | `900000` | wall-clock limit per lane (15 min); the lane is stopped and its output kept |
-| `laneTokenBudget` | `600000` | token ceiling per lane; `0` disables it |
+| `laneTokenBudget` | `0` (off) | token ceiling per lane. Off by default because an agent re-sends its context every step; 2M+ is a sensible backstop |
 | `provider` | `spawn` | `ctx.subagents` backend used for builders |
 | `pollMs` | `900` | live counter refresh interval |
 | `commandName` | `clone` | rename the slash command |
