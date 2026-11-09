@@ -416,6 +416,9 @@
       <div class="feature reveal"><h3><span class="ico">⏱</span> Budgets, not patience</h3><p>Effort budget in the prompt, a wall-clock limit and a token ceiling. Whichever hits first settles the lane with whatever it delivered — a runaway builder costs one lane, not the month.</p></div>
       <div class="feature reveal"><h3><span class="ico">↻</span> Iterate, don’t restart</h3><p><code>/clone refine 2 “move the CTA up”</code> edits the adopted page and reports the score delta against the same reference.</p></div>
       <div class="feature reveal"><h3><span class="ico">⟲</span> Survives a restart</h3><p>Every clone writes its state next to its work. A reload or a restart does not throw the run away — <code>pick</code> still works, and a half-built lane is labelled as interrupted, not as finished.</p></div>
+      <div class="feature reveal"><h3><span class="ico">✓</span> A gate before a score</h3><p>A static, model-free checklist runs first: every local reference resolves, no CDN fetch, no placeholder copy, images have <code>alt</code>, controls have labels. Fail it and the lane cannot be adopted, whatever it scored.</p></div>
+      <div class="feature reveal"><h3><span class="ico">▦</span> Evidence, not just a number</h3><p>Every rendered lane gets a diff heatmap — the reference dimmed under the disagreement — plus the worst regions named in words. “91.9%” becomes “the chart area is off by 40”.</p></div>
+      <div class="feature reveal"><h3><span class="ico">↗</span> It learns your repository</h3><p>Each clone records which strategy won here. After three runs, <code>/clone</code> picks the strategies that actually win on your screens and says why.</p></div>
       <div class="feature reveal"><h3><span class="ico">⛨</span> Sandboxed by default</h3><p>Model-written pages are served under a <code>sandbox</code> CSP and mounted with <code>sandbox="allow-scripts"</code>: they cannot reach your cookies, storage or the Harness API.</p></div>
     </div>
   </section>
@@ -427,6 +430,7 @@
       <h3>Honest limits, kept in the README and on purpose</h3>
       <ul>
         <li><b>The score measures the picture, not the truth.</b> 99% agreement can still hide wrong copy or broken behaviour. It ranks attempts; it does not certify one.</li>
+        <li><b>The gate checks structure, not behaviour.</b> It proves a page is complete, self-contained and labelled — it cannot prove a button does anything. Dynamic checks need the DevTools protocol and are not in this version.</li>
         <li><b>The score is coarse by design, but not colour-blind.</b> A colour grid with shift tolerance decides most of it; a structure term (where the detail sits) catches “right palette, wrong picture”. Two unrelated dark interfaces still score ~58%, two lanes a few points apart are still a coin flip — open both.</li>
         <li><b>Cost is N×.</b> Three builders cost roughly three builds. <code>lanes: 2</code> is a reasonable everyday setting.</li>
         <li><b>Vision is required.</b> A text-only model produces a guess, not a clone.</li>

@@ -721,6 +721,14 @@ test('engine: a lane that fails the acceptance gate is kept but never adoptable'
     assert.match(snapshot.lanes[0].gate.failed.join(' '), /assets/u)
     assert.equal(clone.winner, null, 'a rejected lane is never the suggested winner')
     await assert.rejects(() => engine.pick({ cloneId: clone.id, laneNumber: 1 }), /nothing to adopt|empty|settled/u)
+
+    // A restart must not launder a rejected lane into an adoptable one.
+    const revived = new CloneEngine(deps)
+    await revived.restore(workspace)
+    const restoredLane = revived.get(clone.id).lanes[0]
+    assert.equal(restoredLane.status, 'rejected')
+    assert.equal(restoredLane.gate.pass, false)
+    await assert.rejects(() => revived.pick({ cloneId: clone.id, laneNumber: 1 }), /nothing to adopt|empty|settled/u)
   } finally {
     await rm(workspace, { recursive: true, force: true })
     await rm(images, { recursive: true, force: true })
