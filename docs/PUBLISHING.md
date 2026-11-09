@@ -156,8 +156,8 @@ filename literally — a versioned name would 404 on the next release.
 | Step | State |
 |---|---|
 | npm account | signed in as `egorfedorov` |
-| `npm publish` | **blocked on 2FA** — the publish needs a one-time password (`EOTP`). Either run `npm publish --access public` in a terminal and finish the browser prompt, or supply the 6-digit code for `npm publish --otp=<code>` |
-| Market index | live and valid, published `0.2.0` from a pinned git commit; switches to the npm source once the package is on the registry |
+| `npm publish` | **done** — `dsh-clone@0.2.0` is live on the registry (`latest`), repository linked, `dsh.bundle` + `dsh.client` declared |
+| Market index | live and valid, now pointing at the npm source: installs resolve to `dsh-clone@0.2.0` |
 | awesome-dsh-plugin PR | **[#13425](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13425)** open — CI's repo-age gate needs the repository to be 1 day old (2026-11-09 16:05 UTC); the verdict re-runs itself |
 | Official program form | copy ready in [storefront/official-program-submission.md](storefront/official-program-submission.md) (EN + 中文); only the account owner can submit it |
 | Storefront screenshot of the panel itself | still missing — the four declared images are real plugin outputs, not the panel. Needs a browser session |

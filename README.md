@@ -80,6 +80,8 @@ The score is the plugin's own, and it has three parts: both images are averaged 
 dsh-clone
 ```
 
+Published on npm as [`dsh-clone`](https://www.npmjs.com/package/dsh-clone) — `npm install dsh-clone` also works for a checkout.
+
 Or add this repository's market index under **Plugins → Custom plugin indexes**, and install `dsh-clone` from the Discover tab in one click:
 
 ```
