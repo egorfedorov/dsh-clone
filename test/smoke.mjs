@@ -9,6 +9,10 @@
  */
 
 import assert from 'node:assert/strict'
+import { execFile as execFileCallback } from 'node:child_process'
+import { promisify } from 'node:util'
+
+const execFileAsync = promisify(execFileCallback)
 import { inspect } from 'node:util'
 import { mkdtemp, mkdir, writeFile, readFile, readdir, rm, stat, cp, copyFile, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -950,6 +954,16 @@ test('engine: adopt as a patch writes new files and diffs the overlapping ones',
         await writeFile(join(cwd, 'styles.css'), 'body{margin:0}')
       },
     })
+    // The diff itself comes from `git diff --no-index`, which works outside a
+    // repository, so give this fixture a real runner.
+    deps.git = async (args, cwd) => {
+      try {
+        const { stdout, stderr } = await execFileAsync('git', args, { cwd })
+        return { code: 0, stdout, stderr }
+      } catch (error) {
+        return { code: error.code ?? 1, stdout: error.stdout ?? '', stderr: error.stderr ?? '' }
+      }
+    }
     let sequence = 0
     deps.id = () => `p${String((sequence += 1)).padStart(7, '0')}`
     deps.scoreLane = async ({ outPath }) => ({ score: 90, outPath: `${outPath}.png` })
@@ -968,6 +982,61 @@ test('engine: adopt as a patch writes new files and diffs the overlapping ones',
     assert.match(patch, /--- a\/index\.html/u)
     assert.match(patch, /\+<!doctype html>new version with more copy/u)
     assert.equal(adopted.applied, false, 'a plain directory is not a repository, so nothing is applied')
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+    await rm(images, { recursive: true, force: true })
+  }
+})
+
+test('engine: the adoption patch applies with git', async (t) => {
+  const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
+  const images = await mkdtemp(join(tmpdir(), 'dsh-clone-img-'))
+  const imagePath = join(images, 'mock.png')
+  await writeFile(imagePath, 'png-bytes')
+  const target = join(workspace, 'components', 'card')
+  await mkdir(target, { recursive: true })
+  await writeFile(join(target, 'index.html'), '<!doctype html>\n<h1>old</h1>\n')
+
+  try {
+    // The engine needs a repository so the patch is root-relative and applied.
+    const gitRun = async (args, cwd) => {
+      try {
+        const { stdout, stderr } = await execFileAsync('git', args, { cwd })
+        return { code: 0, stdout, stderr }
+      } catch (error) {
+        return { code: error.code ?? 1, stdout: error.stdout ?? '', stderr: error.stderr ?? '' }
+      }
+    }
+    await gitRun(['init', '-q'], workspace)
+    await gitRun(['-c', 'user.email=t@t', '-c', 'user.name=t', 'add', '-A'], workspace)
+    await gitRun(['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'base'], workspace)
+
+    const { deps } = fakeDeps(workspace, {
+      imagePath,
+      laneBuilder: async (cwd) => {
+        await writeFile(join(cwd, 'index.html'), '<!doctype html>\n<h1>new</h1>\n<p>more copy</p>\n')
+        await writeFile(join(cwd, 'extra.css'), 'body{margin:0}')
+      },
+    })
+    deps.git = gitRun
+    const repo = { root: workspace, base: 'HEAD', gitDir: join(workspace, '.git') }
+    deps.git = gitRun
+    let sequence = 0
+    deps.id = () => `q${String((sequence += 1)).padStart(7, '0')}`
+    deps.scoreLane = async ({ outPath }) => ({ score: 90, outPath: `${outPath}.png` })
+    deps.acceptLane = async () => ({ pass: true, checks: [{ id: 'page', ok: true, detail: 'ok' }] })
+
+    const engine = new CloneEngine(deps)
+    const clone = await engine.start({ agent: { id: 's1' }, sessionId: 's1', lanes: 1, note: '', viewport: 'auto' })
+    // The fixture is not a repository; give the clone one so the patch is applied.
+    clone.repo = repo
+    await waitFor(() => clone.status === 'finished')
+
+    const adopted = await engine.adoptAsPatch({ cloneId: clone.id, laneNumber: 1, into: 'components/card' })
+    assert.match(await readFile(adopted.patchPath, 'utf8'), /--- a\/components\/card\/index\.html/u)
+    assert.equal(adopted.applied, true, 'git applied the patch')
+    const merged = await readFile(join(target, 'index.html'), 'utf8')
+    assert.match(merged, /new/u, 'the patch replaced the old content')
   } finally {
     await rm(workspace, { recursive: true, force: true })
     await rm(images, { recursive: true, force: true })
