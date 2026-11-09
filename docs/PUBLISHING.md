@@ -151,14 +151,19 @@ The asset name is deliberately version-free in the awesome entry's `tarball:`
 field (`latest/download/dsh-clone.tgz`), because `latest/download/` takes the
 filename literally — a versioned name would 404 on the next release.
 
+## Status
+
+| Step | State |
+|---|---|
+| npm account | signed in as `egorfedorov` |
+| `npm publish` | **blocked on 2FA** — the publish needs a one-time password (`EOTP`). Either run `npm publish --access public` in a terminal and finish the browser prompt, or supply the 6-digit code for `npm publish --otp=<code>` |
+| Market index | live and valid, published `0.2.0` from a pinned git commit; switches to the npm source once the package is on the registry |
+| awesome-dsh-plugin PR | **[#13425](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13425)** open — CI's repo-age gate needs the repository to be 1 day old (2026-11-09 16:05 UTC); the verdict re-runs itself |
+| Official program form | copy ready in [storefront/official-program-submission.md](storefront/official-program-submission.md) (EN + 中文); only the account owner can submit it |
+| Storefront screenshot of the panel itself | still missing — the four declared images are real plugin outputs, not the panel. Needs a browser session |
+
 ## What is still missing
 
-- **npm publish** — needs your `npm login`; the token in this machine's
-  `~/.npmrc` is expired (`npm whoami` → 401).
-- **The awesome-dsh-plugin PR** — needs the 1-day age gate (after
-  2026-11-09 16:05 UTC) and your GitHub account's sign-off on the description.
-- **The official form** — needs your identity.
-- **A storefront screenshot of the Clone panel itself** — the four declared
-  screenshots are real plugin outputs (reference, rendered clone, second run),
-  not a picture of the panel. That needs a browser session, which this
-  environment does not have.
+- **The npm one-time password** for the first publish (see the table above).
+- **A picture of the Clone panel** for the storefront: the declared screenshots
+  are real plugin output, which is honest but not the same thing.
