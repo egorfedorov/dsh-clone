@@ -22,11 +22,12 @@ import { cp, copyFile, mkdir, readFile, readdir, realpath, rm, stat, symlink, wr
 import { CloneEngine } from './lib/engine.js'
 import { parseCloneArgs, referenceHintOf } from './lib/parse.js'
 import { makeScoreLane } from './lib/score-lane.js'
+import { scoreRender } from './lib/score.js'
+import { detectRenderer, inspectPage, lastInspectDiagnostic } from './lib/render.js'
 import { pathToFileURL } from 'node:url'
 import { join } from 'node:path'
 import { runAcceptance } from './lib/accept.js'
 import { buildDiff } from './lib/diff.js'
-import { inspectPage, lastInspectDiagnostic } from './lib/render.js'
 import { clampLanes, mediaTypeOf, reasonOf, truncate } from './lib/util.js'
 import {
   parsePreviewPath,
