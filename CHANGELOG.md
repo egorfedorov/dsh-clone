@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.3.0 — 2026-11-09
+
+A score alone invites the right objection: *high score, but does it work?* This
+release answers it with a gate, with evidence, and with memory.
+
+**Acceptance gate**
+
+- every delivered lane passes a static, model-free checklist before it is scored:
+  the page has real content, `<html lang>` and `<title>`, every local reference
+  resolves (no 404s), nothing fetches from a CDN, no placeholder copy, images
+  carry `alt`, and form controls carry labels;
+- a lane that fails is kept for inspection, shows its failing checks in the panel,
+  and **cannot be adopted** — whatever it scored.
+
+**Diff heatmap**
+
+- each rendered lane gets a PNG that lays its disagreement over the dimmed
+  reference, plus the sixteen regions named in words with their difference, so
+  "91.9%" becomes "the chart area is off by 40";
+- written by a new dependency-free PNG encoder (~60 lines, Node's zlib).
+
+**The leaderboard**
+
+- every finished clone records one row per lane — strategy, score, gate result,
+  win — in `.dsh-clone/leaderboard.json` (workspace only, never uploaded);
+- after three recorded runs, `/clone` picks the strategies that have been winning
+  on this repository and explains the choice in the panel and in `status`.
+
+**Fixes found by the new tests**
+
+- `rejected` was not a terminal lane state, so a clone whose only lane failed the
+  gate never finished;
+- the auto-viewport test raced with its own first clone (constant ids in the
+  fixture), which made the suite flake.
+
 ## 0.2.0 — 2026-11-09
 
 Everything in this release is about the plugin being right when it is left alone.

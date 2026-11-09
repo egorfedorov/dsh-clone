@@ -109,7 +109,7 @@ Paste a screenshot into the conversation, then:
 | `/clone 4` | four lanes — maximal spread of approaches |
 | `/clone 2 darker, mobile-first` | two lanes plus a note every builder must honour |
 | `/clone 3 ./mock.png` | use an explicit image path instead of the conversation image |
-| `/clone status` | lane states, scores, and the suggested winner |
+| `/clone status` | lane states, scores, gate results, worst regions, and the local leaderboard |
 | `/clone pick 2` | adopt lane 2 into the workspace |
 | `/clone refine 2 move the CTA up` | rebuild the adopted page with one change, scored against the same reference |
 | `/clone cancel` | stop the builders |
@@ -135,6 +135,8 @@ A small chip under the composer shows `clone · 2/3` while builders run, so you 
 
 ## How it works
 
+**The gate comes first.** A page is measured only after it passes a deterministic, model-free checklist: every local reference exists (no 404s), nothing fetches from a CDN, no placeholder copy, images carry `alt`, form controls carry labels, and the document has a language and a title. A lane that fails is kept for inspection, shown with the failing checks, and **cannot be adopted** — however high it scored.
+
 **Isolation.** Each lane gets its own directory. Inside a git repository that is a real `git worktree` on its own branch (`dsh-clone/<id>-lane-<n>`), so nothing leaks between attempts and nothing touches your working tree. Outside a repository it is a plain directory under `.dsh-clone/<id>/lane-<n>/`. Existing `node_modules`, `.venv` and `vendor` are symlinked into each lane instead of reinstalled.
 
 **The builders.** Each lane is a subagent with one job: read the reference image, then ship `index.html` plus any local CSS/JS/assets. The delivery contract is identical for every lane and non-negotiable:
@@ -144,6 +146,10 @@ A small chip under the composer shows `clone · 2/3` while builders run, so you 
 The strategies differ; the contract does not. Every lane also carries an explicit effort budget (≈20-25 tool calls) and a wall-clock limit: a builder that keeps polishing is stopped, and whatever it already wrote is delivered and scored instead of stalling the clone.
 
 **The score.** When a lane delivers, the plugin finds an installed Chromium-family browser (Chrome, Chromium, Edge, Brave — `DSH_CLONE_BROWSER` overrides), screenshots the page at the reference's own pixel size, and compares it with the reference: both images are averaged into a 48×32 colour grid and the mean absolute difference becomes a percentage. Highest score suggests the winner; you still choose. No browser, no score — the panel then falls back to completeness and finish order.
+
+**The evidence.** Alongside the score, each rendered lane gets a diff heatmap: the reference dimmed under the disagreement, cell by cell, plus the worst regions named in words ("lower-middle-centre-left, 40"). A percentage invites argument; a picture that shows where the rebuild drifts ends it.
+
+**The memory.** Every finished clone records one row per lane — strategy, score, gate result, win — into `.dsh-clone/leaderboard.json`, in the workspace, never uploaded. Once a strategy has run a few times, `/clone` stops handing out strategies blindly and picks the ones that have been winning here, saying why: *"picked visual-first, measure-first — visual-first has won 3/4 here (mean 92%)"*.
 
 **The preview.** Lane pages are served from this page's own origin through `/api/dsh-clone/preview/<clone>/<lane>/` — no extra port, no proxy, the same authenticated connection the UI already uses. Because the HTML is model-written, it is served with a `sandbox` CSP (no `allow-same-origin`) and mounted in a `sandbox="allow-scripts"` iframe: a clone can run its own code, but it cannot reach your session, credentials, or the Harness API.
 
@@ -169,6 +175,7 @@ All optional; the defaults are the intended experience.
 | `laneTimeoutMs` | `900000` | wall-clock limit per lane (15 min); the lane is stopped and its output kept |
 | `laneTokenBudget` | `0` (off) | token ceiling per lane. Off by default because an agent re-sends its context every step; 2M+ is a sensible backstop |
 | `nudgeAtTools` | `12` | tool calls after which a lane with no `index.html` is told to stop analysing and write the page; `0` disables it |
+| `autoStrategies` | `true` | let the local leaderboard choose which strategies run; `false` keeps the configured order for a controlled comparison |
 | `provider` | `spawn` | `ctx.subagents` backend used for builders |
 | `pollMs` | `900` | live counter refresh interval |
 | `commandName` | `clone` | rename the slash command |
@@ -193,6 +200,7 @@ All optional; the defaults are the intended experience.
 ## Honest limits
 
 - **Cost is N×.** Three builders cost roughly three builds. `lanes: 2` is a reasonable everyday setting; `lanes: 1` makes it a plain "screenshot → page" button.
+- **The gate checks structure, not behaviour.** It proves the page is complete, self-contained and labelled; it cannot prove a button does anything. Dynamic checks (console errors, overflow) need the DevTools protocol and are not in this version.
 - **The score measures the picture, not the truth.** 92% agreement can still hide wrong copy, a missing form action, or broken behaviour. It ranks attempts; it does not certify one.
 - **The score is coarse by design.** A 48×32 grid with shift tolerance is forgiving about a few pixels and strict about a panel on the wrong side; the structure term catches "right colour, wrong picture". Two lanes a few points apart are still a coin flip — open both before adopting.
 - **Vision is required.** The builder must actually see the reference. A text-only model produces a guess; pair dsh-clone with a vision-capable route or a vision bridge plugin.
@@ -222,8 +230,11 @@ lib/png.js          Dependency-free PNG decoder
 lib/parse.js        /clone grammar
 lib/rank.js         Adoptability, score-first ordering, suggestion
 lib/preview.js      Static lane serving, media types, sandbox CSP, JSON routes
+lib/accept.js       Static acceptance gate (assets, no external fetches, copy, a11y)
+lib/diff.js         Diff heatmap and the named worst regions
+lib/leaderboard.js  Per-workspace strategy record and recommendation
 lib/util.js         Small pure helpers
-test/smoke.mjs      30 tests, no Harness required
+test/smoke.mjs      52 tests, no Harness required
 test/git-lane.mjs   worktree isolation against a real repository
 test/render-score.mjs  real render + score through the plugin's own path
 index.json          Format-1 plugin market index (Custom plugin indexes)
@@ -244,7 +255,7 @@ ACCEPTABLE-USE.md
 
 ```bash
 npm run check       # syntax-check every shipped file
-npm test            # 30 assertions: grammar, ranking, scoring, engine lifecycle
+npm test            # 52 assertions: grammar, ranking, gate, diff, leaderboard, engine
 npm run test:git    # the git-worktree isolation model against a real repository
 npm run test:score  # a real render + score through the plugin's own code path
 npm run test:all    # all three

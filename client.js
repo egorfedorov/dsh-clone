@@ -73,6 +73,11 @@ window.__ModuleLoader__.load({
       'panel.running': 'building',
       'panel.settled': 'ready',
       'panel.scoring': 'scoring',
+      'panel.rejected': 'rejected',
+      'panel.gate': 'gate',
+      'panel.diff': 'diff ↗',
+      'panel.worst': 'worst',
+      'panel.board': 'here',
       'panel.emptyLane': 'no page',
       'panel.failed': 'failed',
       'panel.cancelled': 'cancelled',
@@ -201,6 +206,7 @@ window.__ModuleLoader__.load({
       running: T.brand,
       scoring: T.brand,
       settled: T.success,
+      rejected: T.error,
       finished: T.success,
       empty: T.warn,
       failed: T.error,
@@ -301,7 +307,8 @@ window.__ModuleLoader__.load({
       const ready = lane.status === 'settled' && lane.delivered
       const adopted = clone.picked !== null && clone.picked.lane === lane.index
       const suggested = clone.winner === lane.index
-      const showFrame = lane.status === 'settled' || lane.status === 'empty'
+      // A rejected lane keeps its page visible: seeing what failed the gate is the point.
+      const showFrame = lane.status === 'settled' || lane.status === 'rejected' || lane.status === 'empty'
 
       return h('div', {
         style: {
@@ -339,6 +346,23 @@ window.__ModuleLoader__.load({
             },
           }, lane.strategyLabel),
           h('span', { key: 'spacer', style: { flex: '1 1 auto' } }),
+          lane.gate !== null && lane.gate !== undefined && lane.gate.pass === false
+            ? h('span', {
+              key: 'gate',
+              title: `acceptance gate failed: ${lane.gate.failed.join('; ')}`,
+              style: {
+                fontFamily: FONT, fontSize: 10, fontWeight: 700, letterSpacing: '0.02em',
+                color: T.error, border: `0.5px solid ${T.error}`, borderRadius: 5,
+                padding: '0 5px', lineHeight: '16px', textTransform: 'uppercase', flex: 'none',
+              },
+            }, translate(props, 'panel.rejected'))
+            : lane.gate !== null && lane.gate !== undefined && lane.gate.pass === true
+              ? h('span', {
+                key: 'gate',
+                title: `${lane.gate.checks} acceptance checks passed`,
+                style: { fontFamily: FONT, fontSize: 10.5, color: T.success, flex: 'none' },
+              }, '✓')
+              : null,
           typeof lane.score === 'number'
             ? h('span', {
               key: 'score',
@@ -409,7 +433,31 @@ window.__ModuleLoader__.load({
             lane.files > 0 ? ` · ${lane.files} ${translate(props, 'panel.files')}` : '',
             formatTokens(lane.tokens) === null ? '' : ` · ${formatTokens(lane.tokens)} tok`,
           ].join('')),
+          lane.worstRegion !== null && lane.worstRegion !== undefined
+            ? h('span', {
+              key: 'worst',
+              title: `largest disagreement: ${lane.worstRegion.name}`,
+              style: {
+                fontFamily: MONO, fontSize: 10, color: T.warn,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 'none',
+              },
+            }, `${translate(props, 'panel.worst')} ${lane.worstRegion.name.replace(/-/gu, ' ')}`)
+            : null,
           h('span', { key: 'spacer', style: { flex: '1 1 auto' } }),
+          lane.diffUrl === null || lane.diffUrl === undefined
+            ? null
+            : h('a', {
+              key: 'diff',
+              href: lane.diffUrl,
+              target: '_blank',
+              rel: 'noreferrer',
+              title: 'open the diff heatmap',
+              onClick: (event) => event.stopPropagation(),
+              style: {
+                fontFamily: FONT, fontSize: 11, color: T.label2, textDecoration: 'none',
+                border: `0.5px solid ${T.borderL1}`, borderRadius: 6, padding: '1px 6px', flex: 'none',
+              },
+            }, translate(props, 'panel.diff')),
           adopted
             ? h(Pill, { key: 'adopted', tone: 'success' }, translate(props, 'panel.adopted'))
             : h(Button, {
@@ -417,7 +465,11 @@ window.__ModuleLoader__.load({
               primary: ready,
               disabled: !ready || busy,
               onClick: () => onAdopt(lane.index + 1),
-              title: ready ? undefined : translate(props, 'panel.emptyLane'),
+              title: ready
+                ? undefined
+                : lane.gate !== null && lane.gate !== undefined && lane.gate.pass === false
+                  ? `acceptance gate failed: ${lane.gate.failed.join('; ')}`
+                  : translate(props, 'panel.emptyLane'),
             }, translate(props, 'panel.adopt')),
         ]),
       ])
@@ -456,6 +508,16 @@ window.__ModuleLoader__.load({
           key: 'title',
           style: { fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: T.label },
         }, translate(props, 'panel.title')),
+        clone === null ? null : h('span', {
+          key: 'board',
+          title: clone.leaderboard !== undefined && clone.leaderboard !== null && clone.leaderboard.runs > 0
+            ? clone.leaderboard.rows.map((row) => `${row.id}: ${row.wins}/${row.runs} wins, mean ${row.meanScore}%`).join('\n')
+            : 'no runs recorded in this workspace yet',
+          style: {
+            fontFamily: MONO, fontSize: 10.5, color: T.label3, flex: 'none',
+            border: `0.5px solid ${T.borderL1}`, borderRadius: 6, padding: '1px 6px',
+          },
+        }, `${clone.leaderboard === undefined || clone.leaderboard === null ? 0 : clone.leaderboard.runs} runs ${translate(props, 'panel.board')}`),
         clone === null ? null : h('span', {
           key: 'note',
           style: {

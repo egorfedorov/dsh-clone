@@ -23,6 +23,9 @@ import { mediaTypeFor, parsePreviewPath, safeJoin, sendJson } from '../lib/previ
 import { decodePng, readPngSize } from '../lib/png.js'
 import { GRID, colourSimilarity, combineScore, edgeGridOf, gridOf, scoreLabel, scoreRender } from '../lib/score.js'
 import { detectRenderer, resetRendererCache } from '../lib/render.js'
+import { runAcceptance } from '../lib/accept.js'
+import { buildDiff, summariseRegions } from '../lib/diff.js'
+import { emptyBoard, recordRun, recommendStrategies, standing, summariseBoard, MIN_RUNS_TO_RECOMMEND } from '../lib/leaderboard.js'
 
 let passed = 0
 const tests = []
@@ -382,6 +385,147 @@ test('render: browser detection never throws and caches its answer', async () =>
   assert.equal(await detectRenderer(run), null, 'the second call reuses the cached miss')
 })
 
+// ── acceptance gate ───────────────────────────────────────────────────────
+
+/** Build a fake lane filesystem: `{ 'index.html': '<html>…' }`. */
+const laneFs = (files) => ({
+  readFile: async (path) => {
+    const relative = path.replace(/^.*?\/lane\//u, '')
+    if (files[relative] === undefined) throw new Error(`ENOENT ${relative}`)
+    return files[relative]
+  },
+})
+
+const GOOD_PAGE = `<!doctype html>
+<html lang="en"><head><title>Billing</title><link rel="stylesheet" href="styles.css"></head>
+<body>
+  <header><h1>Aurora Pro</h1><p>annual plan · renews May 12</p></header>
+  <section><ul><li>Storage 412 GB</li><li>Seats 7 of 10</li></ul>
+  <form><label for="e">Email</label><input id="e" type="email"></form></section>
+</body></html>`
+
+test('gate: a clean page passes every check', async () => {
+  const result = await runAcceptance({
+    fs: laneFs({ 'index.html': GOOD_PAGE, 'styles.css': 'body{margin:0}' }),
+    dir: '/lane',
+    files: [{ path: 'index.html' }, { path: 'styles.css' }],
+  })
+  assert.equal(result.pass, true, JSON.stringify(result.checks.filter((check) => !check.ok)))
+  assert.deepEqual(result.checks.map((check) => check.id), ['page', 'document-meta', 'no-external', 'assets', 'no-placeholder', 'images-alt', 'form-labels'])
+})
+
+test('gate: a missing stylesheet fails the assets check', async () => {
+  const result = await runAcceptance({
+    fs: laneFs({ 'index.html': GOOD_PAGE }),
+    dir: '/lane',
+    files: [{ path: 'index.html' }],
+  })
+  assert.equal(result.pass, false)
+  const assets = result.checks.find((check) => check.id === 'assets')
+  assert.equal(assets.ok, false)
+  assert.match(assets.detail, /styles\.css/u)
+})
+
+test('gate: an external font fails the no-external check', async () => {
+  const page = GOOD_PAGE.replace('</head>', '<link href="https://fonts.googleapis.com/css2?family=Inter" rel="stylesheet"></head>')
+  const result = await runAcceptance({ fs: laneFs({ 'index.html': page, 'styles.css': '' }), dir: '/lane', files: [{ path: 'index.html' }, { path: 'styles.css' }] })
+  assert.equal(result.checks.find((check) => check.id === 'no-external').ok, false)
+  assert.equal(result.pass, false)
+})
+
+test('gate: placeholder copy, missing alt and an unlabelled input are each caught', async () => {
+  const placeholder = await runAcceptance({
+    fs: laneFs({ 'index.html': GOOD_PAGE.replace('annual plan', 'Lorem ipsum dolor sit amet'), 'styles.css': '' }),
+    dir: '/lane', files: [{ path: 'index.html' }, { path: 'styles.css' }],
+  })
+  assert.equal(placeholder.checks.find((check) => check.id === 'no-placeholder').ok, false)
+
+  const noAlt = await runAcceptance({
+    fs: laneFs({ 'index.html': GOOD_PAGE.replace('<h1>', '<img src="styles.css"><h1>'), 'styles.css': '' }),
+    dir: '/lane', files: [{ path: 'index.html' }, { path: 'styles.css' }],
+  })
+  assert.equal(noAlt.checks.find((check) => check.id === 'images-alt').ok, false)
+
+  const unlabelled = await runAcceptance({
+    fs: laneFs({ 'index.html': GOOD_PAGE.replace('<label for="e">Email</label><input id="e" type="email">', '<input type="email">'), 'styles.css': '' }),
+    dir: '/lane', files: [{ path: 'index.html' }, { path: 'styles.css' }],
+  })
+  assert.equal(unlabelled.checks.find((check) => check.id === 'form-labels').ok, false)
+})
+
+test('gate: an empty shell fails the page check', async () => {
+  const result = await runAcceptance({
+    fs: laneFs({ 'index.html': '<!doctype html><html lang="en"><head><title>T</title></head><body><div></div></body></html>' }),
+    dir: '/lane', files: [{ path: 'index.html' }],
+  })
+  assert.equal(result.checks.find((check) => check.id === 'page').ok, false)
+  assert.equal(result.pass, false)
+})
+
+// ── diff heatmap ──────────────────────────────────────────────────────────
+
+test('diff: the heatmap is a PNG of the grid size and names the worst region', () => {
+  const result = buildDiff({ referencePng, renderPng })
+  const image = decodePng(result.png)
+  assert.deepEqual({ width: image.width, height: image.height }, { width: 48 * 12, height: 32 * 12 })
+  assert.equal(result.regions.length, 16)
+  assert.equal(result.regions[0].difference >= result.regions[result.regions.length - 1].difference, true)
+  assert.match(result.worst.name, /^(top|upper-middle|lower-middle|bottom)-(left|centre-left|centre-right|right)$/u)
+  assert.ok(result.mean >= 0 && result.mean < 255)
+})
+
+test('diff: an identical image has zero disagreement everywhere', () => {
+  const result = buildDiff({ referencePng, renderPng: referencePng })
+  assert.equal(result.mean, 0)
+  assert.equal(result.regions.every((region) => region.difference === 0), true)
+})
+
+test('diff: regions summarise arbitrary grids', () => {
+  const grid = new Float32Array(48 * 32)
+  grid.fill(0)
+  // Make the bottom-right quadrant the worst.
+  for (let y = 24; y < 32; y += 1) for (let x = 36; x < 48; x += 1) grid[y * 48 + x] = 60
+  const regions = summariseRegions(grid)
+  assert.equal(regions[0].name, 'bottom-right')
+})
+
+// ── leaderboard ───────────────────────────────────────────────────────────
+
+test('leaderboard: stays out of the way until it has evidence', () => {
+  const board = emptyBoard()
+  const ids = ['measure-first', 'structure-first', 'visual-first', 'component-first']
+  const early = recommendStrategies(board, { strategies: ids, count: 2 })
+  assert.deepEqual(early.picked, ['measure-first', 'structure-first'])
+  assert.match(early.reason, /default order/u)
+  for (let index = 0; index < MIN_RUNS_TO_RECOMMEND; index += 1) {
+    recordRun(board, { strategy: 'visual-first', score: 90, passed: true, won: true })
+  }
+  const late = recommendStrategies(board, { strategies: ids, count: 2 })
+  assert.equal(late.picked[0], 'visual-first')
+  assert.match(late.reason, /visual-first has won 3\/3/u)
+})
+
+test('leaderboard: standing mixes wins, score and gate passes', () => {
+  const winner = standing({ runs: 4, wins: 3, passed: 4, scoreSum: 360, scored: 4 })
+  const loser = standing({ runs: 4, wins: 0, passed: 2, scoreSum: 200, scored: 4 })
+  assert.ok(winner.rank > loser.rank)
+  assert.equal(winner.meanScore, 90)
+  assert.equal(winner.passRate, 1)
+  assert.equal(loser.winRate, 0)
+})
+
+test('leaderboard: the summary is sorted best first and bounded', () => {
+  const board = emptyBoard()
+  for (let index = 0; index < 3; index += 1) {
+    recordRun(board, { strategy: 'measure-first', score: 70, passed: true, won: index === 0 })
+    recordRun(board, { strategy: 'visual-first', score: 95, passed: true, won: index !== 0 })
+  }
+  const summary = summariseBoard(board, 1)
+  assert.equal(summary.runs, 6)
+  assert.equal(summary.rows.length, 1)
+  assert.equal(summary.rows[0].id, 'visual-first')
+})
+
 // ── engine ─────────────────────────────────────────────────────────────────
 
 const realFs = { cp, copyFile, mkdir, readFile, readdir, rm, stat, symlink, writeFile }
@@ -537,6 +681,89 @@ test('engine: a lane over its token budget is stopped and its page kept', async 
     assert.equal(clone.lanes[0].status, 'settled')
     assert.equal(clone.lanes[0].stopReason, 'token-budget')
     assert.equal(interrupted, 1, 'the child was interrupted')
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+    await rm(images, { recursive: true, force: true })
+  }
+})
+
+test('engine: a lane that fails the acceptance gate is kept but never adoptable', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
+  const images = await mkdtemp(join(tmpdir(), 'dsh-clone-img-'))
+  const imagePath = join(images, 'mock.png')
+  await writeFile(imagePath, 'png-bytes')
+
+  try {
+    const { deps } = fakeDeps(workspace, {
+      imagePath,
+      // A page that renders but references a file it never shipped.
+      laneBuilder: async (cwd) => {
+        await writeFile(join(cwd, 'index.html'), '<!doctype html><html lang="en"><head><title>T</title><link rel="stylesheet" href="missing.css"></head><body><h1>Hello</h1><p>Some real copy for the page check, long enough to count.</p></body></html>')
+      },
+    })
+    let sequence = 0
+    deps.id = () => `g${String((sequence += 1)).padStart(7, '0')}`
+    deps.acceptLane = async ({ dir, files }) => runAcceptance({ fs: realFs, dir, files })
+    deps.scoreLane = async ({ outPath }) => ({ score: 91, outPath: `${outPath}.png` })
+
+    const engine = new CloneEngine(deps)
+    const clone = await engine.start({ agent: { id: 's1' }, sessionId: 's1', lanes: 1, note: '', viewport: 'auto' })
+    await waitFor(() => clone.status === 'finished')
+
+    const lane = clone.lanes[0]
+    assert.equal(lane.status, 'rejected')
+    assert.equal(lane.gate.pass, false)
+    assert.match(lane.error, /acceptance gate: assets/u)
+    assert.equal(typeof lane.score, 'number', 'a rejected lane is still scored, for context')
+
+    const snapshot = engine.snapshot(clone)
+    assert.equal(snapshot.lanes[0].gate.pass, false)
+    assert.match(snapshot.lanes[0].gate.failed.join(' '), /assets/u)
+    assert.equal(clone.winner, null, 'a rejected lane is never the suggested winner')
+    await assert.rejects(() => engine.pick({ cloneId: clone.id, laneNumber: 1 }), /nothing to adopt|empty|settled/u)
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+    await rm(images, { recursive: true, force: true })
+  }
+})
+
+test('engine: a finished clone records the leaderboard, and the next clone reads it', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
+  const images = await mkdtemp(join(tmpdir(), 'dsh-clone-img-'))
+  const imagePath = join(images, 'mock.png')
+  await writeFile(imagePath, 'png-bytes')
+
+  try {
+    const { deps } = fakeDeps(workspace, {
+      imagePath,
+      laneBuilder: async (cwd) => {
+        await writeFile(join(cwd, 'index.html'), '<!doctype html><html lang="en"><head><title>T</title></head><body><h1>Hello</h1><p>Some real copy for the page check, long enough to count.</p></body></html>')
+      },
+    })
+    let sequence = 0
+    deps.id = () => `b${String((sequence += 1)).padStart(7, '0')}`
+    deps.acceptLane = async ({ dir, files }) => runAcceptance({ fs: realFs, dir, files })
+    deps.scoreLane = async ({ outPath }) => ({ score: 88, outPath: `${outPath}.png` })
+    deps.config = { viewport: '900x620', autoStrategies: true }
+
+    const engine = new CloneEngine(deps)
+    const boardPath = join(workspace, '.dsh-clone', 'leaderboard.json')
+    for (let run = 0; run < MIN_RUNS_TO_RECOMMEND; run += 1) {
+      const clone = await engine.start({ agent: { id: 's1' }, sessionId: 's1', lanes: 2, note: '', viewport: 'auto' })
+      await waitFor(() => clone.status === 'finished')
+      assert.equal(clone.lanes.every((lane) => lane.gate.pass === true), true)
+    }
+
+    const board = JSON.parse(await readFile(boardPath, 'utf8'))
+    assert.equal(board.runs, MIN_RUNS_TO_RECOMMEND * 2)
+    assert.equal(Object.keys(board.strategies).length, 2, 'two strategies were exercised')
+
+    // With enough evidence the next clone reads the board instead of the defaults.
+    const next = await engine.start({ agent: { id: 's1' }, sessionId: 's1', lanes: 2, note: '', viewport: 'auto' })
+    assert.match(next.strategyReason, /won|default order/u)
+    const summary = engine.snapshot(next).leaderboard
+    assert.ok(summary.runs >= MIN_RUNS_TO_RECOMMEND * 2)
+    assert.equal(summary.rows.length >= 1, true)
   } finally {
     await rm(workspace, { recursive: true, force: true })
     await rm(images, { recursive: true, force: true })
@@ -751,6 +978,11 @@ test('engine: auto viewport follows the reference image size', async () => {
       imagePath,
       laneBuilder: async (cwd) => { await writeFile(join(cwd, 'index.html'), 'ok') },
     })
+    // Two clones in one engine need distinct identities: the shared fixture
+    // returns a constant id, which would put both in the same directory and make
+    // this test race with its own first clone.
+    let sequence = 0
+    deps.id = () => `v${String((sequence += 1)).padStart(7, '0')}`
     const engine = new CloneEngine(deps)
     const auto = await engine.start({ agent: { id: 's1' }, sessionId: 's1', lanes: 1, note: '', viewport: 'auto' })
     assert.equal(auto.viewport, '900x620', 'the reference is 900x620, so the lanes build and render at that size')

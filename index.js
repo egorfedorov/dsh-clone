@@ -22,6 +22,8 @@ import { cp, copyFile, mkdir, readFile, readdir, realpath, rm, stat, symlink, wr
 import { CloneEngine } from './lib/engine.js'
 import { parseCloneArgs, referenceHintOf } from './lib/parse.js'
 import { makeScoreLane } from './lib/score-lane.js'
+import { runAcceptance } from './lib/accept.js'
+import { buildDiff } from './lib/diff.js'
 import { clampLanes, mediaTypeOf, reasonOf, truncate } from './lib/util.js'
 import {
   parsePreviewPath,
@@ -70,6 +72,9 @@ export function resolveConfig(raw) {
     nudgeAtTools: Number.isFinite(input.nudgeAtTools) && input.nudgeAtTools >= 0
       ? Math.floor(input.nudgeAtTools)
       : 12,
+    // Let the local leaderboard reorder which strategies run. Off keeps the
+    // configured order, which is useful for a controlled comparison.
+    autoStrategies: input.autoStrategies !== false,
     commandName: typeof input.commandName === 'string' && input.commandName.length > 0 ? input.commandName : 'clone',
     tool: input.tool !== false,
     command: input.command !== false,
@@ -207,6 +212,18 @@ export async function apply(ctx, rawConfig) {
     })
   }
 
+  /** Static acceptance checklist over one delivered lane. */
+  const acceptLane = async ({ dir, files }) => runAcceptance({ fs: { readFile }, dir, files })
+
+  /** Diff heatmap for one rendered lane, written beside the clone. */
+  const diffLane = async ({ referencePath, renderPath, outPath }) => {
+    const [referencePng, renderPng] = await Promise.all([readFile(referencePath), readFile(renderPath)])
+    const result = buildDiff({ referencePng, renderPng })
+    await mkdir(dirname(outPath), { recursive: true })
+    await writeFile(outPath, result.png)
+    return { outPath, regions: result.regions, worst: result.worst, mean: result.mean }
+  }
+
   const engine = new CloneEngine({
     now: () => Date.now(),
     id: () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}${Math.random()}`),
@@ -222,6 +239,8 @@ export async function apply(ctx, rawConfig) {
     getAgent: (childId) => ctx.agents.get(childId),
     resolveReference,
     scoreLane,
+    acceptLane,
+    buildDiff: diffLane,
     nudgeLane,
     workingDirectory: ctx.workingDirectory,
     logger: { warn: (message) => log('warn', message) },
@@ -247,7 +266,23 @@ export async function apply(ctx, rawConfig) {
       const size = lane.files.length === 0 ? 'no files' : `${lane.files.length} files`
       const suggested = lane.index === clone.winner ? ' · suggested' : ''
       const score = typeof lane.score === 'number' ? ` · ${lane.score}% match` : ''
-      lines.push(`  lane ${lane.index + 1} (${lane.strategy.label}): ${badge} · ${lane.tools} tools · ${size}${score}${suggested}${lane.error === null ? '' : ` · ${lane.error}`}`)
+      const gate = lane.gate === undefined
+        ? ''
+        : lane.gate.pass
+          ? ' · gate ✓'
+          : ` · gate ✗ (${lane.gate.checks.filter((check) => !check.ok).map((check) => check.id).join(', ')})`
+      const worst = lane.worstRegion === undefined || lane.worstRegion === null
+        ? ''
+        : ` · worst ${lane.worstRegion.name} (${lane.worstRegion.difference})`
+      lines.push(`  lane ${lane.index + 1} (${lane.strategy.label}): ${badge} · ${lane.tools} tools · ${size}${score}${gate}${worst}${suggested}${lane.error === null ? '' : ` · ${lane.error}`}`)
+    }
+    if (clone.strategyReason !== null && clone.strategyReason !== undefined) lines.push(`Lanes: ${clone.strategyReason}`)
+    const board = clone.workspace === undefined ? null : engine.boards.get(clone.workspace)
+    if (board !== undefined && board !== null && board.runs > 0) {
+      const top = Object.entries(board.strategies)
+        .map(([id, row]) => ({ id, ...row }))
+        .sort((left, right) => right.wins / Math.max(1, right.runs) - left.wins / Math.max(1, left.runs))[0]
+      lines.push(`Leaderboard here: ${board.runs} run(s); best so far ${top.id} (${top.wins}/${top.runs} wins)`)
     }
     if (clone.picked !== null) lines.push(`Adopted into: ${clone.picked.path}`)
     else if (clone.status === 'finished') lines.push('Adopt one with: /clone pick <lane>')
@@ -533,6 +568,22 @@ export async function apply(ctx, rawConfig) {
         },
       })
 
+      const diff = scope.webServer.register({
+        kind: 'exact',
+        path: '/api/dsh-clone/diff',
+        handler: async (request, response) => {
+          if (reject(request, response)) return
+          const url = new URL(request.url ?? '/', 'http://127.0.0.1')
+          const clone = engine.get(url.searchParams.get('cloneId') ?? '')
+          const lane = clone?.lanes?.[Number(url.searchParams.get('lane')) - 1]
+          if (clone === undefined || lane === undefined || typeof lane.diffPath !== 'string') {
+            sendText(response, 404, 'not found')
+            return
+          }
+          await serveImageFile({ fs: { readFile }, path: lane.diffPath, mediaType: 'image/png', response })
+        },
+      })
+
       const preview = scope.webServer.register({
         kind: 'prefix',
         path: '/api/dsh-clone/preview/',
@@ -601,7 +652,7 @@ export async function apply(ctx, rawConfig) {
       })
 
       return () => {
-        for (const dispose of [state, reference, render, preview, action]) {
+        for (const dispose of [state, reference, render, diff, preview, action]) {
           try {
             dispose()
           } catch {
