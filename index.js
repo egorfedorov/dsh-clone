@@ -58,6 +58,11 @@ export function resolveConfig(raw) {
     laneTimeoutMs: Number.isFinite(input.laneTimeoutMs) && input.laneTimeoutMs >= 60_000
       ? Math.floor(input.laneTimeoutMs)
       : 15 * 60 * 1000,
+    // Token ceiling per lane, so a builder cannot run away with the month.
+    // 0 disables it; the default is generous for one static page.
+    laneTokenBudget: Number.isFinite(input.laneTokenBudget) && input.laneTokenBudget >= 0
+      ? Math.floor(input.laneTokenBudget)
+      : 600_000,
     commandName: typeof input.commandName === 'string' && input.commandName.length > 0 ? input.commandName : 'clone',
     tool: input.tool !== false,
     command: input.command !== false,
@@ -210,9 +215,13 @@ export async function apply(ctx, rawConfig) {
       return 'No clone yet. Paste a screenshot, then run /clone 3 — or /clone 3 ./mock.png'
     }
     const lines = [
-      `Clone ${clone.id} · ${clone.status}${clone.note.length > 0 ? ` · "${truncate(clone.note, 60)}"` : ''}`,
-      `Reference: ${clone.reference.label} · viewport ${clone.viewport}`,
+      `Clone ${clone.id} · ${clone.status}${clone.kind === 'refine' ? ' · refine' : ''}${clone.note.length > 0 ? ` · "${truncate(clone.note, 60)}"` : ''}`,
+      `Reference: ${clone.reference.label} · viewport ${clone.viewport}${clone.restored === true ? ' · restored after a restart' : ''}`,
     ]
+    if (clone.kind === 'refine' && typeof clone.sourceScore === 'number') {
+      const delta = typeof clone.delta === 'number' ? clone.delta : null
+      lines.push(`Refined from ${clone.sourceId} (was ${clone.sourceScore}%)${delta === null ? '' : ` → ${delta >= 0 ? '+' : ''}${delta} points`}`)
+    }
     for (const lane of clone.lanes) {
       const badge = lane.status === 'settled' ? 'ready' : lane.status
       const size = lane.files.length === 0 ? 'no files' : `${lane.files.length} files`
@@ -246,6 +255,23 @@ export async function apply(ctx, rawConfig) {
 
   const latestClone = (sessionId) => engine.latestForSession(sessionId)
 
+  /**
+   * Find a clone by id, falling back to what is on disk.
+   *
+   * The engine's memory does not survive a plugin reload; the workspace does.
+   * Restoring lazily keeps an expensive finished run adoptable afterwards.
+   */
+  const findClone = async (cloneId, agent) => {
+    const known = cloneId === undefined ? undefined : engine.get(cloneId)
+    if (known !== undefined) return known
+    try {
+      await engine.restore(await ctx.workingDirectory.ensure(agent))
+    } catch (error) {
+      log('warn', `could not restore clones: ${reasonOf(error)}`)
+    }
+    return cloneId === undefined ? engine.latestForSession(agent.id) : engine.get(cloneId)
+  }
+
   const perform = async ({ action, cloneId, lane, agent, sessionId, lanes, note }) => {
     switch (action) {
       case 'start': {
@@ -255,11 +281,31 @@ export async function apply(ctx, rawConfig) {
       case 'status': {
         // `clone_id` addresses an older clone, which the panel cannot reach once
         // a newer one exists; without it the newest clone for this session wins.
-        const target = cloneId === undefined ? latestClone(sessionId) : engine.get(cloneId)
-        if (cloneId !== undefined && target === undefined) {
+        const target = cloneId === undefined ? latestClone(sessionId) ?? await findClone(undefined, agent) : await findClone(cloneId, agent)
+        if (cloneId !== undefined && (target === undefined || target === null)) {
           throw new Error(`dsh-clone: unknown clone "${cloneId}"`)
         }
         return { text: renderStatus(target ?? null), clone: target ?? null }
+      }
+      case 'refine': {
+        const source = cloneId === undefined ? await findClone(undefined, agent) : await findClone(cloneId, agent)
+        if (source === undefined || source === null) throw new Error('dsh-clone: no clone to refine')
+        const refined = await engine.refine({
+          cloneId: source.id,
+          laneNumber: lane ?? null,
+          agent,
+          change: note ?? '',
+          viewport: undefined,
+        })
+        const base = typeof refined.sourceScore === 'number' ? ` Previously ${refined.sourceScore}%.` : ''
+        return {
+          text: [
+            `Refining lane ${(refined.lanes[0]?.index ?? 0) + 1} of clone ${source.id} into ${refined.id}.${base}`,
+            'The builder edits the page it already wrote instead of starting over; the result is scored against the same reference.',
+            'Watch it in the Clone tab, then adopt with /clone pick 1.',
+          ].join(' '),
+          clone: refined,
+        }
       }
       case 'pick': {
         const target = cloneId === undefined ? latestClone(sessionId) : engine.get(cloneId)
@@ -304,6 +350,7 @@ export async function apply(ctx, rawConfig) {
                 '/clone [lanes] [note] — rebuild the last image in this conversation (or a path in the note) using N lanes (1-4)',
                 '/clone status — lane states of the latest clone',
                 '/clone pick <lane> — copy that lane into the workspace as a working app',
+                '/clone refine [lane] [change] — rebuild the adopted page with one change, scored against the same reference',
                 '/clone cancel — stop the builders',
                 '/clone discard — delete the scratch directories',
               ].join('\n'),
@@ -313,8 +360,9 @@ export async function apply(ctx, rawConfig) {
             return { kind: 'success', text: renderStatus(latestClone(invocation.agent.id)) }
           }
           const result = await perform({
-            action: parsed.kind === 'pick' ? 'pick' : parsed.kind === 'cancel' ? 'cancel' : 'discard',
+            action: parsed.kind,
             lane: parsed.lane ?? null,
+            note: parsed.note ?? '',
             agent: invocation.agent,
             sessionId: invocation.agent.id,
           })
@@ -334,7 +382,7 @@ export async function apply(ctx, rawConfig) {
       description: [
         'Rebuild a user interface from a reference screenshot, in parallel, and adopt the result the user prefers.',
         'Use `start` when the user shows a screenshot and wants it as working code: it launches N builder agents, each in its own isolated directory (a git worktree inside a repository), all rebuilding the same reference image.',
-        'The operations mirror the /clone command: start, status, pick, cancel, discard. `pick` copies one finished lane into the workspace as a working static page.',
+        'The operations mirror the /clone command: start, status, pick, refine, cancel, discard. `pick` copies one finished lane into the workspace as a working static page; `refine` rebuilds an adopted page with one requested change and scores it against the same reference, so the improvement is measurable.',
       ].join(' '),
       parameters: {
         type: 'object',
@@ -343,7 +391,7 @@ export async function apply(ctx, rawConfig) {
         properties: {
           action: {
             type: 'string',
-            enum: ['start', 'status', 'pick', 'cancel', 'discard'],
+            enum: ['start', 'status', 'pick', 'refine', 'cancel', 'discard'],
             description: 'start a clone, read its state, adopt one lane, stop the builders, or delete the scratch directories.',
           },
           lanes: {
@@ -356,7 +404,7 @@ export async function apply(ctx, rawConfig) {
           },
           lane: {
             type: 'number',
-            description: '1-based lane number for `pick`. Omitted adopts the suggested lane.',
+            description: '1-based lane number for `pick` or `refine`. Omitted uses the suggested lane.',
           },
           clone_id: {
             type: 'string',
@@ -543,6 +591,16 @@ export async function apply(ctx, rawConfig) {
       }
     }, 'dsh-clone: web routes')
   })
+
+  // A plugin reload must not leave builder agents spending tokens for a result
+  // nobody can reach; their lanes keep whatever they wrote, on disk.
+  ctx.effect(() => () => {
+    try {
+      engine.dispose()
+    } catch (error) {
+      log('warn', `dispose failed: ${reasonOf(error)}`)
+    }
+  }, 'dsh-clone: stop builders on unload')
 
   log('info', `mounted (lanes=${config.lanes}, viewport=${config.viewport}, command=/${config.commandName})`)
 }

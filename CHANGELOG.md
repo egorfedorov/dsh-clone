@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.2.0 — 2026-11-09
+
+Everything in this release is about the plugin being right when it is left alone.
+
+**Scoring is now a real measurement**
+
+- colour comparison forgives a small uniform shift, so a 4px offset is not a
+  different design while a misplaced panel still costs real points;
+- a separate **structure** term compares where the detail sits (softened edge
+  energy, normalised by the reference), so a flat block that happens to average
+  to the right colour no longer scores as a faithful rebuild;
+- published runs re-measured on the same artifacts: dashboard 91.9%, landing
+  91.9%, billing card 97.8%, sign-in 79%. Two unrelated screens now score 24-58%
+  instead of ~89%, which is the whole point of having a number.
+
+**The engine survives being interrupted**
+
+- each clone writes `state.json` next to its work; `status` and `pick` restore
+  clones from disk after a plugin reload or a restart;
+- a lane that was building when the plugin went away keeps whatever it had
+  already written, and is reported as interrupted rather than finished;
+- unloading the plugin now interrupts its builder agents instead of leaving them
+  spending tokens for a result nobody can reach.
+
+**New pass: iterate instead of restarting**
+
+- `/clone refine [lane] [change]` copies the adopted page into a fresh
+  single-lane clone and asks for the smallest edit that satisfies one change;
+  the reference and viewport are unchanged, so the result reports a score delta.
+
+**Budget**
+
+- `laneTokenBudget` (default 600k) stops a lane that burns past its ceiling and
+  keeps whatever it delivered, alongside the existing wall-clock limit.
+
+**Robustness**
+
+- a rendered screenshot must decode before it is scored; a truncated capture is
+  retried instead of producing a garbage number;
+- the renderer finds Chrome/Chromium/Edge/Brave on Windows as well as macOS and
+  Linux;
+- `status` accepts a `clone_id`, so an older clone stays inspectable.
+
+## 0.1.0 — 2026-11-09
+
 ## 0.1.0 — 2026-11-09
 
 First release.

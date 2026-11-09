@@ -49,8 +49,12 @@ console.log(`  browser: ${browser.version} (${browser.command})`)
 
 const realFs = { cp, copyFile, mkdir, readFile, readdir, realpath, rm, stat, symlink, writeFile }
 const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-score-'))
-const demoDir = new URL('../docs/demo/', import.meta.url).pathname
-const referencePath = new URL('../docs/assets/reference.png', import.meta.url).pathname
+// The card pair was built and measured at one size (520x360), so rendering the
+// page at the reference's own size is a fair comparison — which is exactly what
+// the plugin does. Using the sign-in page here would test a page designed for
+// 1280x800 at 900x620, where its layout legitimately collapses.
+const faithfulPage = new URL('../docs/demo/card.html', import.meta.url).pathname
+const referencePath = new URL('../docs/assets/card-reference.png', import.meta.url).pathname
 let failures = 0
 
 const check = async (name, fn) => {
@@ -74,9 +78,8 @@ try {
       // The two builders differ on purpose: one ships the real demo page, the
       // other ships a deliberate near-miss, so the ranking has something to do.
       const nearMiss = label.endsWith('2')
-      const html = await readFile(join(demoDir, 'index.html'), 'utf8')
+      const html = await readFile(faithfulPage, 'utf8')
       await writeFile(join(cwd, 'index.html'), nearMiss ? grayscale(html) : html)
-      await copyFile(join(demoDir, 'styles.css'), join(cwd, 'styles.css'))
       children.set(label, true)
       return {
         childId: `child-${label}`,
@@ -105,7 +108,7 @@ try {
   }
 
   await check('auto viewport came from the reference size', async () => {
-    assert.equal(clone.viewport, '900x620')
+    assert.equal(clone.viewport, '520x360')
   })
 
   await check('both delivered lanes came back with a real score', async () => {
@@ -121,11 +124,8 @@ try {
 
   await check('the faithful lane outscores the near-miss', async () => {
     const [faithful, nearMiss] = clone.lanes
-    assert.ok(faithful.score > nearMiss.score, `expected ${faithful.score} > ${nearMiss.score}`)
-    // The committed demo page was built for 1280x800 while this test renders at
-    // the reference's own 900x620, so a perfect score is not expected here — the
-    // ordering is what matters, plus a clearly non-noise floor.
-    assert.ok(faithful.score > 60, `expected a recognisable match, got ${faithful.score}`)
+    assert.ok(faithful.score > nearMiss.score + 5, `expected a clear win, got ${faithful.score} vs ${nearMiss.score}`)
+    assert.ok(faithful.score > 85, `expected a strong match, got ${faithful.score}`)
   })
 
   await check('the winner follows the score, and the snapshot carries both', async () => {
@@ -142,7 +142,7 @@ try {
     assert.deepEqual([...bytes.slice(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
     const width = bytes.readUInt32BE(16)
     const height = bytes.readUInt32BE(20)
-    assert.deepEqual({ width, height }, { width: 900, height: 620 })
+    assert.deepEqual({ width, height }, { width: 520, height: 360 })
   })
 } finally {
   await rm(workspace, { recursive: true, force: true })

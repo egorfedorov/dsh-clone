@@ -63,14 +63,14 @@ Real runs, not mocks: one command each, no retries, no hand edits. Every page is
 
 | Reference | The clone, rendered by the plugin | Result |
 |---|---|---|
-| <img src="docs/assets/nebula-dashboard.png" alt="reference observability dashboard" width="330"> | <img src="docs/assets/nebula-clone.png" alt="the dashboard clone, rendered" width="330"> | **98.5% match** · 1280×800 · two lanes raced, the better one adopted · [open it](https://egorfedorov.github.io/dsh-clone/demo/nebula/) |
-| <img src="docs/assets/aperture-landing.png" alt="reference landing page" width="330"> | <img src="docs/assets/aperture-clone.png" alt="the landing clone, rendered" width="330"> | **98% match** · 1280×800 · one lane · [open it](https://egorfedorov.github.io/dsh-clone/demo/aperture/) |
-| <img src="docs/assets/card-reference.png" alt="reference billing card" width="330"> | <img src="docs/assets/card-clone.png" alt="the billing card clone, rendered" width="330"> | **99.8% match** · 520×360 · one file · [open it](https://egorfedorov.github.io/dsh-clone/demo/card.html) |
-| <img src="docs/assets/reference.png" alt="reference sign-in screen" width="330"> | <img src="demo/preview.png" alt="the sign-in clone, rendered" width="330"> | **92.7% match** · 900×620 · [open it](https://egorfedorov.github.io/dsh-clone/demo/) |
+| <img src="docs/assets/nebula-dashboard.png" alt="reference observability dashboard" width="330"> | <img src="docs/assets/nebula-clone.png" alt="the dashboard clone, rendered" width="330"> | **91.9% match** · 1280×800 · two lanes raced, the better one adopted · [open it](https://egorfedorov.github.io/dsh-clone/demo/nebula/) |
+| <img src="docs/assets/aperture-landing.png" alt="reference landing page" width="330"> | <img src="docs/assets/aperture-clone.png" alt="the landing clone, rendered" width="330"> | **91.9% match** · 1280×800 · one lane · [open it](https://egorfedorov.github.io/dsh-clone/demo/aperture/) |
+| <img src="docs/assets/card-reference.png" alt="reference billing card" width="330"> | <img src="docs/assets/card-clone.png" alt="the billing card clone, rendered" width="330"> | **97.8% match** · 520×360 · one file · [open it](https://egorfedorov.github.io/dsh-clone/demo/card.html) |
+| <img src="docs/assets/reference.png" alt="reference sign-in screen" width="330"> | <img src="demo/preview.png" alt="the sign-in clone, rendered" width="330"> | **79% match** · 900×620 · [open it](https://egorfedorov.github.io/dsh-clone/demo/) |
 
 The dashboard and the landing page are the interesting ones: a sidebar, KPI cards with sparklines, a layered area chart, a donut, a data table; glass panels over a gradient mesh, a feature grid and a footer. Both were rebuilt from a single screenshot.
 
-The score is the plugin's own: the rendered page and the reference are averaged into a coarse colour grid and compared. It measures *how much of the picture agrees*, not whether the page is correct — see [Honest limits](#honest-limits).
+The score is the plugin's own, and it has three parts: both images are averaged into a coarse colour grid, the colour comparison forgives a small uniform shift, and a separate **structure** term compares where the detail sits. The mix measures *how much of the picture agrees*, not whether the page is correct — two unrelated dark interfaces land around 58%, a faithful rebuild above 90%. See [Honest limits](#honest-limits).
 
 ## Install
 
@@ -109,6 +109,7 @@ Paste a screenshot into the conversation, then:
 | `/clone 3 ./mock.png` | use an explicit image path instead of the conversation image |
 | `/clone status` | lane states, scores, and the suggested winner |
 | `/clone pick 2` | adopt lane 2 into the workspace |
+| `/clone refine 2 move the CTA up` | rebuild the adopted page with one change, scored against the same reference |
 | `/clone cancel` | stop the builders |
 | `/clone discard` | delete the scratch directories and lane branches |
 
@@ -146,6 +147,12 @@ The strategies differ; the contract does not. Every lane also carries an explici
 
 **Adoption.** `pick` copies the chosen lane into the workspace as `clone-<id>-lane-<n>/`, without `.git`, without the symlinked dependency directories, and without the builder's scratch files. The other lanes stay where they are until you `/clone discard`.
 
+**Iteration.** `refine` takes an adopted lane, copies its page into a fresh single-lane clone and asks the builder for the smallest edit that satisfies one change — the reference and the viewport stay the same, so the new score is directly comparable and the clone reports the delta.
+
+**Durability.** Each clone writes a small `state.json` next to its work. A plugin reload or a restart does not throw the run away: `status` and `pick` rebuild it from disk, and a lane that was mid-build keeps whatever it had already written, labelled as interrupted rather than pretending it finished.
+
+**Budgets.** Every builder gets an effort budget in the prompt, a wall-clock limit (`laneTimeoutMs`) and a token ceiling (`laneTokenBudget`). Whichever is hit first settles the lane with whatever it delivered — a runaway builder costs one lane, not the month.
+
 ## Configuration
 
 All optional; the defaults are the intended experience.
@@ -156,6 +163,7 @@ All optional; the defaults are the intended experience.
 | `maxLanes` | `4` | hard cap on lanes per clone |
 | `viewport` | `auto` | build and render size; `auto` uses the reference image's own pixel size |
 | `laneTimeoutMs` | `900000` | wall-clock limit per lane (15 min); the lane is stopped and its output kept |
+| `laneTokenBudget` | `600000` | token ceiling per lane; `0` disables it |
 | `provider` | `spawn` | `ctx.subagents` backend used for builders |
 | `pollMs` | `900` | live counter refresh interval |
 | `commandName` | `clone` | rename the slash command |
@@ -181,7 +189,7 @@ All optional; the defaults are the intended experience.
 
 - **Cost is N×.** Three builders cost roughly three builds. `lanes: 2` is a reasonable everyday setting; `lanes: 1` makes it a plain "screenshot → page" button.
 - **The score measures the picture, not the truth.** 92% agreement can still hide wrong copy, a missing form action, or broken behaviour. It ranks attempts; it does not certify one.
-- **The score is coarse by design.** A 48×32 grid is forgiving about a few pixels and strict about a panel on the wrong side. Two lanes a few points apart are usually a coin flip — open both before adopting.
+- **The score is coarse by design.** A 48×32 grid with shift tolerance is forgiving about a few pixels and strict about a panel on the wrong side; the structure term catches "right colour, wrong picture". Two lanes a few points apart are still a coin flip — open both before adopting.
 - **Vision is required.** The builder must actually see the reference. A text-only model produces a guess; pair dsh-clone with a vision-capable route or a vision bridge plugin.
 - **Images are approximated.** Without image generation, photos and illustrations become CSS/SVG stand-ins with the right silhouette and palette, not the original pixels.
 - **Static output.** No Next.js project, no design system — by design, so the result is always runnable in one click.
@@ -190,11 +198,10 @@ All optional; the defaults are the intended experience.
 
 ## Roadmap
 
-1. **Score-aware iteration** — `/clone refine 2 "move the CTA up"` re-opens the adopted lane against the same reference and reports the score delta.
-2. **Region scoring** — "clone just this card": compare only the rectangle that matters instead of the whole page.
-3. **Adopt as a diff** — when the workspace is a component library, adopt as an edit to an existing file instead of a new folder.
-4. **Lane budgets in tokens** — a ceiling per lane, not just wall-clock.
-5. **Multi-reference** — several screenshots of the same flow, one page per screen.
+1. **Region scoring** — "clone just this card": compare only the rectangle that matters instead of the whole page.
+2. **Adopt as a diff** — when the workspace is a component library, adopt as an edit to an existing file instead of a new folder.
+3. **Multi-reference** — several screenshots of the same flow, one page per screen.
+4. **Panel screenshots in the storefront** — the four declared images are plugin output, not the panel itself.
 
 ## Repository layout
 

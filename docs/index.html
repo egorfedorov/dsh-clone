@@ -331,7 +331,7 @@
       <img src="assets/nebula-clone.png" alt="The dashboard clone the plugin built, rendered">
       <div class="after"><img src="assets/nebula-dashboard.png" alt="The reference dashboard the clone was built from"></div>
       <span class="tag left">Reference</span>
-      <span class="tag right">Clone · 98.5%</span>
+      <span class="tag right">Clone · 91.9%</span>
       <div class="handle"><span class="knob">↔</span></div>
       <div class="split-line"></div>
       <input type="range" min="0" max="100" value="50" aria-label="Compare the reference and the clone">
@@ -340,16 +340,16 @@
 
     <div class="scores">
       <div class="score-card reveal">
-        <div class="ring" data-score="98.5">
+        <div class="ring" data-score="91.9">
           <svg width="72" height="72" viewBox="0 0 72 72"><defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8fb0ff"/><stop offset="1" stop-color="#35d07f"/></linearGradient></defs><circle class="track" cx="36" cy="36" r="30"/><circle class="bar" cx="36" cy="36" r="30"/></svg>
-          <b>98.5%</b>
+          <b>91.9%</b>
         </div>
-        <p><strong>Nebula dashboard</strong>1280×800 · two lanes raced · winner rendered and compared at the reference's own size</p>
+        <p><strong>Nebula dashboard</strong>1280×800 · two lanes raced · colour agreement 97.7%, structure 82.4%</p>
       </div>
       <div class="score-card reveal">
-        <div class="ring" data-score="98">
+        <div class="ring" data-score="91.9">
           <svg width="72" height="72" viewBox="0 0 72 72"><circle class="track" cx="36" cy="36" r="30"/><circle class="bar" cx="36" cy="36" r="30"/></svg>
-          <b>98%</b>
+          <b>91.9%</b>
         </div>
         <p><strong>Aperture landing</strong>1280×800 · one lane · glass panels, gradient mesh, feature grid, footer</p>
       </div>
@@ -368,19 +368,19 @@
     <div class="gallery">
       <a class="ex reveal" href="demo/nebula/">
         <img src="assets/nebula-clone.png" alt="Nebula dashboard clone" loading="lazy">
-        <span class="ex-meta"><b>Nebula — AI observability</b><i>98.5% · 1280×800 · 3 files</i></span>
+        <span class="ex-meta"><b>Nebula — AI observability</b><i>91.9% · 1280×800 · 3 files</i></span>
       </a>
       <a class="ex reveal" href="demo/aperture/">
         <img src="assets/aperture-clone.png" alt="Aperture landing clone" loading="lazy">
-        <span class="ex-meta"><b>Aperture — landing page</b><i>98% · 1280×800 · 1 file</i></span>
+        <span class="ex-meta"><b>Aperture — landing page</b><i>91.9% · 1280×800 · 1 file</i></span>
       </a>
       <a class="ex reveal" href="demo/card.html">
         <img src="assets/card-clone.png" alt="Billing card clone" loading="lazy">
-        <span class="ex-meta"><b>Billing card</b><i>99.8% · 520×360 · 1 file</i></span>
+        <span class="ex-meta"><b>Billing card</b><i>97.8% · 520×360 · 1 file</i></span>
       </a>
       <a class="ex reveal" href="demo/">
         <img src="demo/preview.png" alt="Sign-in screen clone" loading="lazy">
-        <span class="ex-meta"><b>Sign-in screen</b><i>92.7% · 900×620 · 3 files</i></span>
+        <span class="ex-meta"><b>Sign-in screen</b><i>79% · 900×620 · 3 files</i></span>
       </a>
     </div>
   </section>
@@ -413,7 +413,9 @@
       <div class="feature reveal"><h3><span class="ico">⌘</span> Your checkout is never touched</h3><p>Lanes live in worktrees and in <code>.dsh-clone/</code>. No commit, no checkout, no reset on your branch — a test asserts exactly that.</p></div>
       <div class="feature reveal"><h3><span class="ico">◱</span> Live, side by side</h3><p>The Clone tab shows the reference beside every lane's actual page in an iframe, with strategy, timing, tools and tokens.</p></div>
       <div class="feature reveal"><h3><span class="ico">⧉</span> Dependencies shared, not reinstalled</h3><p><code>node_modules</code>, <code>.venv</code> and <code>vendor</code> are symlinked into each lane. Three lanes do not mean three installs.</p></div>
-      <div class="feature reveal"><h3><span class="ico">⏱</span> Budgets, not patience</h3><p>Every builder gets an effort budget and a wall-clock limit. A lane that keeps polishing is stopped and its finished page is still delivered and scored.</p></div>
+      <div class="feature reveal"><h3><span class="ico">⏱</span> Budgets, not patience</h3><p>Effort budget in the prompt, a wall-clock limit and a token ceiling. Whichever hits first settles the lane with whatever it delivered — a runaway builder costs one lane, not the month.</p></div>
+      <div class="feature reveal"><h3><span class="ico">↻</span> Iterate, don’t restart</h3><p><code>/clone refine 2 “move the CTA up”</code> edits the adopted page and reports the score delta against the same reference.</p></div>
+      <div class="feature reveal"><h3><span class="ico">⟲</span> Survives a restart</h3><p>Every clone writes its state next to its work. A reload or a restart does not throw the run away — <code>pick</code> still works, and a half-built lane is labelled as interrupted, not as finished.</p></div>
       <div class="feature reveal"><h3><span class="ico">⛨</span> Sandboxed by default</h3><p>Model-written pages are served under a <code>sandbox</code> CSP and mounted with <code>sandbox="allow-scripts"</code>: they cannot reach your cookies, storage or the Harness API.</p></div>
     </div>
   </section>
@@ -425,7 +427,7 @@
       <h3>Honest limits, kept in the README and on purpose</h3>
       <ul>
         <li><b>The score measures the picture, not the truth.</b> 99% agreement can still hide wrong copy or broken behaviour. It ranks attempts; it does not certify one.</li>
-        <li><b>The score is coarse by design.</b> Two lanes a few points apart are usually a coin flip — open both before adopting.</li>
+        <li><b>The score is coarse by design, but not colour-blind.</b> A colour grid with shift tolerance decides most of it; a structure term (where the detail sits) catches “right palette, wrong picture”. Two unrelated dark interfaces still score ~58%, two lanes a few points apart are still a coin flip — open both.</li>
         <li><b>Cost is N×.</b> Three builders cost roughly three builds. <code>lanes: 2</code> is a reasonable everyday setting.</li>
         <li><b>Vision is required.</b> A text-only model produces a guess, not a clone.</li>
         <li><b>Images are approximated</b> with CSS and SVG — the right silhouette and palette, not the original pixels.</li>

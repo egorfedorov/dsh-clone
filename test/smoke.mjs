@@ -21,7 +21,7 @@ import { CloneEngine } from '../lib/engine.js'
 import { clampLanes, formatDuration, isImagePath, mediaTypeOf, slugify, totalTokens, truncate, extensionOf } from '../lib/util.js'
 import { mediaTypeFor, parsePreviewPath, safeJoin, sendJson } from '../lib/preview.js'
 import { decodePng, readPngSize } from '../lib/png.js'
-import { GRID, gridOf, gridSimilarity, scoreLabel, scoreRender } from '../lib/score.js'
+import { GRID, colourSimilarity, combineScore, edgeGridOf, gridOf, scoreLabel, scoreRender } from '../lib/score.js'
 import { detectRenderer, resetRendererCache } from '../lib/render.js'
 
 let passed = 0
@@ -194,7 +194,115 @@ test('rank: unscored lanes still fall back to finish order', () => {
 // ── pixels and scoring ────────────────────────────────────────────────────
 
 const referencePng = await readFile(new URL('../docs/assets/reference.png', import.meta.url))
+
+/** Shift decoded pixels, filling the exposed edge with the corner colour. */
+function shiftImage(image, dx, dy) {
+  const { width, height, data } = image
+  const out = new Uint8Array(width * height * 4)
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const sx = Math.min(width - 1, Math.max(0, x - dx))
+      const sy = Math.min(height - 1, Math.max(0, y - dy))
+      const from = (sy * width + sx) * 4
+      const to = (y * width + x) * 4
+      out[to] = data[from]
+      out[to + 1] = data[from + 1]
+      out[to + 2] = data[from + 2]
+      out[to + 3] = data[from + 3]
+    }
+  }
+  return { width, height, data: out }
+}
+
+/** Replace each block with its average colour: the palette survives, the detail does not. */
+function flatImage(image, block = 24) {
+  const { width, height, data } = image
+  const out = new Uint8Array(data)
+  for (let by = 0; by < height; by += block) {
+    for (let bx = 0; bx < width; bx += block) {
+      let red = 0
+      let green = 0
+      let blue = 0
+      let count = 0
+      for (let y = by; y < Math.min(height, by + block); y += 1) {
+        for (let x = bx; x < Math.min(width, bx + block); x += 1) {
+          const index = (y * width + x) * 4
+          red += data[index]
+          green += data[index + 1]
+          blue += data[index + 2]
+          count += 1
+        }
+      }
+      if (count === 0) continue
+      for (let y = by; y < Math.min(height, by + block); y += 1) {
+        for (let x = bx; x < Math.min(width, bx + block); x += 1) {
+          const index = (y * width + x) * 4
+          out[index] = Math.round(red / count)
+          out[index + 1] = Math.round(green / count)
+          out[index + 2] = Math.round(blue / count)
+        }
+      }
+    }
+  }
+  return { width, height, data: out }
+}
+
+// A minimal PNG encoder for the synthetic cases above (truecolour, no filter).
+import { deflateSync } from 'node:zlib'
+
+function encodeTestPng(image) {
+  const { width, height, data } = image
+  const scanlines = Buffer.alloc((width * 3 + 1) * height)
+  let cursor = 0
+  for (let y = 0; y < height; y += 1) {
+    scanlines[cursor] = 0
+    cursor += 1
+    for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 4
+      scanlines[cursor] = data[index]
+      scanlines[cursor + 1] = data[index + 1]
+      scanlines[cursor + 2] = data[index + 2]
+      cursor += 3
+    }
+  }
+  const chunk = (type, body) => {
+    const length = Buffer.alloc(4)
+    length.writeUInt32BE(body.length)
+    const typed = Buffer.concat([Buffer.from(type, 'ascii'), body])
+    const crc = Buffer.alloc(4)
+    crc.writeUInt32BE(crc32(typed) >>> 0)
+    return Buffer.concat([length, typed, crc])
+  }
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(width, 0)
+  ihdr.writeUInt32BE(height, 4)
+  ihdr[8] = 8
+  ihdr[9] = 2
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(scanlines)),
+    chunk('IEND', Buffer.alloc(0)),
+  ])
+}
+
+let crcTable
+function crc32(buffer) {
+  if (crcTable === undefined) {
+    crcTable = new Int32Array(256)
+    for (let n = 0; n < 256; n += 1) {
+      let c = n
+      for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+      crcTable[n] = c
+    }
+  }
+  let crc = -1
+  for (const byte of buffer) crc = (crc >>> 8) ^ crcTable[(crc ^ byte) & 0xff]
+  return crc ^ -1
+}
 const renderPng = await readFile(new URL('./fixtures/render-lane.png', import.meta.url))
+/** A capture of a different screen, used to prove the metric separates them. */
+const wrongScreenPng = await readFile(new URL('../docs/assets/card-clone.png', import.meta.url))
 
 test('png: decodes the demo reference with its real dimensions and pixels', () => {
   const image = decodePng(referencePng)
@@ -219,20 +327,50 @@ test('score: an image against itself is a perfect match', () => {
   assert.equal(scoreRender({ referencePng, renderPng: referencePng }).score, 100)
   const grid = gridOf(decodePng(referencePng))
   assert.equal(grid.length, GRID.columns * GRID.rows * 3)
-  assert.equal(gridSimilarity(grid, grid), 100)
+  assert.equal(colourSimilarity(grid, grid).similarity, 100)
+  assert.equal(combineScore(100, 100), 100)
+  assert.equal(edgeGridOf(decodePng(referencePng)).length, GRID.columns * GRID.rows)
 })
 
 test('score: a real lane render scores high against its reference', () => {
-  const { score } = scoreRender({ referencePng, renderPng })
-  assert.ok(score > 90, `expected a strong match, got ${score}`)
-  assert.ok(score <= 100)
+  const result = scoreRender({ referencePng, renderPng })
+  assert.ok(result.score > 80, `expected a strong match, got ${result.score}`)
+  assert.ok(result.score <= 100)
+  assert.ok(result.colour >= result.score - 5, 'colour agreement is reported separately')
+  assert.ok(result.structure <= 100 && result.structure >= 0)
+  assert.deepEqual(Object.keys(result.shift).sort(), ['x', 'y'])
+})
+
+test('score: a shifted image keeps most of its score', () => {
+  const image = decodePng(referencePng)
+  const shifted = shiftImage(image, 6, 4)
+  const base = scoreRender({ referencePng, renderPng: referencePng }).score
+  const moved = scoreRender({ referencePng, renderPng: encodeTestPng(shifted) }).score
+  assert.ok(base === 100)
+  assert.ok(moved > 80, `a 6px shift should not destroy the score, got ${moved}`)
+})
+
+test('score: a different screen scores far below its own reference', () => {
+  const own = scoreRender({ referencePng, renderPng }).score
+  const other = scoreRender({ referencePng, renderPng: wrongScreenPng }).score
+  assert.ok(own - other > 40, `the metric must separate unrelated screens: ${own} vs ${other}`)
+})
+
+test('score: structure separates a real copy from a flattened one', () => {
+  // Block-averaging keeps the palette but destroys local contrast, so the
+  // colour term stays high while the structure term must fall.
+  const real = scoreRender({ referencePng, renderPng })
+  const flat = scoreRender({ referencePng, renderPng: encodeTestPng(flatImage(decodePng(referencePng))) })
+  assert.ok(flat.colour > 70, `the palette should still agree, got ${flat.colour}`)
+  assert.ok(flat.structure < real.structure - 5, `structure must separate them: ${flat.structure} vs ${real.structure}`)
+  assert.ok(flat.score < real.score, `and the mix must follow: ${flat.score} vs ${real.score}`)
 })
 
 test('score: labels describe the bands without overclaiming', () => {
   assert.match(scoreLabel(96), /near-identical/u)
-  assert.match(scoreLabel(88), /close/u)
-  assert.match(scoreLabel(72), /recognisable/u)
-  assert.match(scoreLabel(55), /same idea/u)
+  assert.match(scoreLabel(92), /close/u)
+  assert.match(scoreLabel(88), /recognisable/u)
+  assert.match(scoreLabel(70), /same idea/u)
   assert.match(scoreLabel(20), /different page/u)
   assert.match(scoreLabel(null), /not scored/u)
 })
@@ -281,6 +419,191 @@ function fakeDeps(workspace, { imagePath, laneBuilder, failLanes = [] }) {
     },
   }
 }
+
+test('engine: clone state survives into a fresh engine instance', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
+  const images = await mkdtemp(join(tmpdir(), 'dsh-clone-img-'))
+  const imagePath = join(images, 'mock.png')
+  await writeFile(imagePath, 'png-bytes')
+
+  try {
+    const { deps } = fakeDeps(workspace, {
+      imagePath,
+      laneBuilder: async (cwd) => { await writeFile(join(cwd, 'index.html'), '<!doctype html>ok') },
+    })
+    const first = new CloneEngine(deps)
+    const clone = await first.start({ agent: { id: 's1' }, sessionId: 's1', lanes: 1, note: 'refine me', viewport: 'auto' })
+    await waitFor(() => clone.status === 'finished')
+
+    const statePath = join(clone.root, 'state.json')
+    assert.equal(await stat(statePath).then(() => true, () => false), true, 'a state file is written')
+    const record = JSON.parse(await readFile(statePath, 'utf8'))
+    assert.equal(record.version, 1)
+    assert.equal(record.lanes.length, 1)
+    assert.equal(record.lanes[0].files.some((file) => file.path === 'index.html'), true)
+
+    // A different engine: nothing in memory, everything on disk.
+    const second = new CloneEngine(deps)
+    assert.equal(second.get(clone.id), undefined)
+    const restored = await second.restore(workspace)
+    assert.equal(restored, 1)
+
+    const revived = second.get(clone.id)
+    assert.equal(revived.status, 'finished')
+    assert.equal(revived.restored, true)
+    assert.equal(revived.lanes[0].status, 'settled')
+    assert.equal(revived.winner, 0)
+    assert.equal(revived.note, 'refine me')
+
+    const picked = await second.pick({ cloneId: clone.id, laneNumber: 1 })
+    assert.equal(await readFile(join(picked.path, 'index.html'), 'utf8'), '<!doctype html>ok')
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+    await rm(images, { recursive: true, force: true })
+  }
+})
+
+test('engine: a lane that was building when the plugin went away is reported honestly', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
+  try {
+    // Hand-write a state file the way a reload would leave it behind.
+    const root = join(workspace, '.dsh-clone', 'dead0001')
+    await mkdir(join(root, 'lane-1'), { recursive: true })
+    await writeFile(join(root, 'lane-1', 'index.html'), '<!doctype html>partial')
+    await writeFile(join(root, 'state.json'), JSON.stringify({
+      version: 1,
+      id: 'dead0001',
+      sessionId: 's1',
+      workspace,
+      note: '',
+      viewport: '900x620',
+      status: 'running',
+      createdAt: Date.now() - 60_000,
+      finishedAt: null,
+      reference: { path: join(root, 'reference.png'), mediaType: 'image/png', label: 'reference.png' },
+      repo: null,
+      winner: null,
+      picked: null,
+      lanes: [{ index: 0, strategy: 'measure-first', status: 'running', dir: join(root, 'lane-1'), files: [{ path: 'index.html', bytes: 20 }] }],
+    }))
+
+    const { deps } = fakeDeps(workspace, { imagePath: join(root, 'reference.png'), laneBuilder: async () => {} })
+    const engine = new CloneEngine(deps)
+    assert.equal(await engine.restore(workspace), 1)
+    const clone = engine.get('dead0001')
+    assert.equal(clone.status, 'finished')
+    assert.equal(clone.lanes[0].status, 'settled', 'work that landed is still adoptable')
+    assert.equal(clone.lanes[0].timedOut, true)
+    assert.match(clone.lanes[0].error, /plugin restarted/u)
+    assert.equal(clone.lanes[0].stopReason, 'interrupted')
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+  }
+})
+
+test('engine: a lane over its token budget is stopped and its page kept', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
+  const images = await mkdtemp(join(tmpdir(), 'dsh-clone-img-'))
+  const imagePath = join(images, 'mock.png')
+  await writeFile(imagePath, 'png-bytes')
+
+  try {
+    const { deps } = fakeDeps(workspace, {
+      imagePath,
+      laneBuilder: async (cwd) => { await writeFile(join(cwd, 'index.html'), '<!doctype html>ok') },
+    })
+    deps.config = { viewport: '900x620', laneTokenBudget: 1000 }
+    deps.spawnAgent = async ({ cwd, label }) => {
+      await writeFile(join(cwd, 'index.html'), '<!doctype html>ok')
+      return { childId: `budget-${label}`, result: new Promise(() => {}), dispose: async () => {} }
+    }
+    let interrupted = 0
+    deps.interruptAgent = () => { interrupted += 1 }
+    // The live child reports far more usage than the budget allows.
+    deps.getAgent = () => ({
+      session: {
+        snapshotEvents: () => [{
+          type: 'assistant/message',
+          data: { usage: { inputTokens: 900, outputTokens: 400, cacheReadTokens: 50 } },
+        }],
+      },
+    })
+
+    const engine = new CloneEngine(deps)
+    const clone = await engine.start({ agent: { id: 's1' }, sessionId: 's1', lanes: 1, note: '', viewport: 'auto' })
+    engine.tick()
+    await waitFor(() => clone.status === 'finished', { timeoutMs: 3000 })
+
+    assert.equal(clone.lanes[0].status, 'settled')
+    assert.equal(clone.lanes[0].stopReason, 'token-budget')
+    assert.equal(interrupted, 1, 'the child was interrupted')
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+    await rm(images, { recursive: true, force: true })
+  }
+})
+
+test('engine: refine edits the adopted page and reports the score delta', async () => {
+  const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
+  const images = await mkdtemp(join(tmpdir(), 'dsh-clone-img-'))
+  const imagePath = join(images, 'mock.png')
+  await writeFile(imagePath, 'png-bytes')
+
+  try {
+    const prompts = []
+    const { deps } = fakeDeps(workspace, {
+      imagePath,
+      laneBuilder: async (cwd) => { await writeFile(join(cwd, 'index.html'), '<!doctype html>v1') },
+    })
+    // Two clones in one test need two identities; the shared fixture returns a
+    // constant id, which would put both clones in the same directory.
+    let sequence = 0
+    deps.id = () => `r${String((sequence += 1)).padStart(7, '0')}`
+    // Scores: the first build 80, the refined build 90.
+    let call = 0
+    deps.scoreLane = async ({ outPath }) => {
+      call += 1
+      return { score: call === 1 ? 80 : 90, outPath: `${outPath}.png` }
+    }
+    const originalSpawn = deps.spawnAgent
+    deps.spawnAgent = async (request) => {
+      prompts.push(request.prompt)
+      // A refine starts from the copied page and edits it.
+      if (request.label === 'clone refine') {
+        await writeFile(join(request.cwd, 'index.html'), '<!doctype html>v2')
+        return { childId: 'refiner', result: Promise.resolve({ output: [{ type: 'text', text: 'moved the CTA' }], stopReason: 'completed' }), dispose: async () => {} }
+      }
+      return originalSpawn(request)
+    }
+
+    const engine = new CloneEngine(deps)
+    const base = await engine.start({ agent: { id: 's1' }, sessionId: 's1', lanes: 1, note: '', viewport: 'auto' })
+    await waitFor(() => base.status === 'finished')
+    assert.equal(base.lanes[0].score, 80)
+
+    const refined = await engine.refine({ cloneId: base.id, laneNumber: 1, agent: { id: 's1' }, change: 'move the CTA up' })
+    assert.equal(refined.kind, 'refine')
+    assert.equal(refined.sourceId, base.id)
+    assert.equal(refined.lanes.length, 1)
+    assert.equal(await readFile(join(refined.lanes[0].dir, 'index.html'), 'utf8'), '<!doctype html>v2', 'the builder edited the copied page')
+
+    const prompt = prompts.find((text) => text.includes('refining a page you already built'))
+    assert.ok(prompt !== undefined, 'the refine prompt was used')
+    assert.match(prompt, /move the CTA up/u)
+    assert.match(prompt, /do not rewrite the page from scratch/iu)
+
+    await waitFor(() => refined.status === 'finished')
+    assert.equal(refined.lanes[0].score, 90)
+    assert.equal(refined.delta, 10)
+    const snapshot = engine.snapshot(refined)
+    assert.equal(snapshot.kind, 'refine')
+    assert.equal(snapshot.delta, 10)
+    assert.equal(snapshot.sourceScore, 80)
+  } finally {
+    await rm(workspace, { recursive: true, force: true })
+    await rm(images, { recursive: true, force: true })
+  }
+})
 
 test('engine: start, settle, snapshot and adopt a lane end to end', async () => {
   const workspace = await mkdtemp(join(tmpdir(), 'dsh-clone-ws-'))
